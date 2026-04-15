@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V75 Replay Coach</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+:root{
+  --bg:#050a0f;--bg2:#090f17;--bg3:#0d1520;--panel:#0a1520;
+  --border:#1a3a5c;--accent:#00d4ff;--green:#00ff88;--red:#ff3355;
+  --warn:#ffcc00;--text:#c8dff0;--text2:#6a9ab8;--text3:#3a6a8a;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,212,255,.01) 2px,rgba(0,212,255,.01) 4px);pointer-events:none;z-index:999;}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;gap:10px;}
+.logo{font-family:'Orbitron',monospace;font-size:16px;font-weight:900;color:var(--accent);letter-spacing:3px;text-shadow:0 0 18px rgba(0,212,255,.5);white-space:nowrap;}
+.logo span{color:var(--green);}
+.topbar-stats{display:flex;align-items:center;gap:8px;flex:1;justify-content:center;flex-wrap:wrap;}
+.pill{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:3px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;white-space:nowrap;}
+.pill .lbl{color:var(--text3);font-size:9px;display:block;letter-spacing:1px;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.ac{color:var(--accent);}
+.ag{color:var(--green);}
+.ar{color:var(--red);}
+.tog{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);cursor:pointer;user-select:none;}
+.tsw{width:32px;height:16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;position:relative;transition:all .3s;flex-shrink:0;}
+.tsw.on{background:rgba(0,212,255,.25);border-color:var(--accent);}
+.tsw::after{content:'';position:absolute;width:10px;height:10px;background:var(--text3);border-radius:50%;top:2px;left:2px;transition:all .3s;}
+.tsw.on::after{left:18px;background:var(--accent);box-shadow:0 0 4px var(--accent);}
+.btn{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:12px;letter-spacing:.5px;padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;border-radius:3px;transition:all .2s;text-transform:uppercase;white-space:nowrap;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.p{background:var(--accent);color:var(--bg);border-color:var(--accent);}
+.btn.p:hover{background:#00b8e6;}
+.btn.s{background:var(--green);color:var(--bg);border-color:var(--green);}
+.btn.w{border-color:var(--warn);color:var(--warn);}
+.btn:disabled{opacity:.3;cursor:not-allowed;}
+
+.main{display:flex;flex:1;overflow:hidden;min-height:0;}
+
+.lp{width:188px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.lp::-webkit-scrollbar{width:2px;}
+.lp::-webkit-scrollbar-thumb{background:var(--border);}
+.ps{padding:10px;border-bottom:1px solid var(--border);}
+.pt{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:2px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;}
+
+.load-all-btn{width:100%;margin-bottom:7px;background:rgba(0,212,255,.08);border:1px solid var(--accent);color:var(--accent);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;padding:6px;cursor:pointer;border-radius:3px;transition:all .2s;letter-spacing:1px;text-transform:uppercase;}
+.load-all-btn:hover{background:rgba(0,212,255,.18);box-shadow:0 0 10px rgba(0,212,255,.2);}
+
+/* Drag-drop overlay */
+.drop-overlay{position:fixed;inset:0;background:rgba(0,212,255,.08);border:3px dashed var(--accent);z-index:800;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;pointer-events:none;}
+.drop-overlay.active{display:flex;}
+.drop-overlay .drop-icon{font-size:52px;animation:bob .8s ease-in-out infinite alternate;}
+.drop-overlay .drop-text{font-family:'Orbitron',monospace;font-size:18px;color:var(--accent);letter-spacing:3px;text-shadow:0 0 20px rgba(0,212,255,.6);}
+.drop-overlay .drop-sub{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text2);}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+
+.tf-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:6px;}
+.tf-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text3);font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 2px;cursor:pointer;border-radius:2px;text-align:center;transition:all .2s;position:relative;}
+.tf-btn:hover{border-color:var(--accent);color:var(--accent);}
+.tf-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.1);}
+.tf-btn.loaded::after{content:'•';position:absolute;top:1px;right:2px;font-size:7px;color:var(--green);}
+
+.load-list{display:flex;flex-direction:column;gap:3px;}
+.load-item{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;background:var(--bg);border:1px solid var(--border);border-radius:2px;}
+.load-item.ok{border-color:rgba(0,255,136,.25);}
+.lname{font-family:'Share Tech Mono',monospace;color:var(--text3);font-size:9px;}
+.lname.ok{color:var(--green);}
+.lbtn{font-family:'Rajdhani',sans-serif;font-size:9px;padding:2px 7px;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;border-radius:2px;transition:all .2s;}
+.lbtn:hover{border-color:var(--accent);color:var(--accent);}
+.lbtn.ok{border-color:rgba(0,255,136,.4);color:var(--green);}
+
+.date-jump-wrap{display:flex;flex-direction:column;gap:5px;margin-bottom:6px;}
+.date-jump-wrap label{font-size:10px;color:var(--text2);}
+.date-jump-row{display:flex;gap:4px;}
+input[type=date].dj{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 5px;border-radius:3px;outline:none;flex:1;min-width:0;}
+input[type=date].dj:focus{border-color:var(--accent);}
+.dj-btn{font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;padding:4px 8px;border:1px solid var(--accent);background:rgba(0,212,255,.1);color:var(--accent);cursor:pointer;border-radius:3px;white-space:nowrap;transition:all .2s;letter-spacing:.5px;}
+.dj-btn:hover{background:rgba(0,212,255,.25);}
+.dj-btn.rnd{border-color:var(--text3);background:transparent;color:var(--text3);}
+.dj-btn.rnd:hover{border-color:var(--warn);color:var(--warn);background:rgba(255,204,0,.08);}
+.sr{display:flex;align-items:center;gap:5px;}
+.sr label{font-size:10px;color:var(--text2);width:44px;flex-shrink:0;}
+input[type=range]{flex:1;accent-color:var(--accent);cursor:pointer;height:3px;}
+.sv{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);width:24px;text-align:right;}
+.rb{display:flex;gap:3px;}
+.rb .btn{flex:1;padding:5px 2px;font-size:10px;}
+.pg{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);text-align:center;}
+
+.lr{display:flex;align-items:center;gap:5px;margin-bottom:6px;}
+.lr label{font-size:10px;color:var(--text2);width:54px;flex-shrink:0;}
+input[type=number]{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:3px 6px;border-radius:3px;width:100%;outline:none;}
+input[type=number]:focus{border-color:var(--accent);}
+.lw{background:rgba(255,204,0,.08);border:1px solid var(--warn);border-radius:3px;padding:4px 6px;font-size:9px;color:var(--warn);margin-bottom:6px;display:none;line-height:1.5;}
+.tb{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;}
+.bb{background:rgba(0,255,136,.12);border:1px solid var(--green);color:var(--green);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;padding:7px;cursor:pointer;border-radius:3px;transition:all .2s;}
+.bb:hover{background:rgba(0,255,136,.25);}
+.bb:disabled,.sb2:disabled{opacity:.3;cursor:not-allowed;}
+.sb2{background:rgba(255,51,85,.12);border:1px solid var(--red);color:var(--red);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;padding:7px;cursor:pointer;border-radius:3px;transition:all .2s;}
+.sb2:hover{background:rgba(255,51,85,.25);}
+.cbt{width:100%;margin-top:4px;background:rgba(255,204,0,.08);border:1px solid var(--warn);color:var(--warn);font-family:'Rajdhani',sans-serif;font-weight:600;font-size:11px;padding:5px;cursor:pointer;border-radius:3px;transition:all .2s;}
+.cbt:hover{background:rgba(255,204,0,.18);}
+.cbt:disabled{opacity:.3;cursor:not-allowed;}
+
+/* Position display */
+.pd{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:7px;font-family:'Share Tech Mono',monospace;font-size:10px;}
+.pr{display:flex;justify-content:space-between;margin-bottom:2px;}
+.pl{color:var(--text3);}
+.pp{color:var(--green);font-weight:700;}
+.pn{color:var(--red);font-weight:700;}
+.np{color:var(--text3);font-size:10px;text-align:center;padding:6px 0;font-family:'Share Tech Mono',monospace;}
+.drag-hint{font-size:9px;color:var(--text3);text-align:center;margin-top:4px;font-style:italic;}
+
+/* CHART */
+.ca{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.ctb{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;}
+.price-big{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--accent);text-shadow:0 0 10px rgba(0,212,255,.4);}
+.price-chg{font-size:10px;font-family:'Share Tech Mono',monospace;}
+.cw{flex:1;position:relative;overflow:hidden;min-height:0;}
+#cvs{display:block;width:100%;height:100%;cursor:crosshair;}
+.empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;}
+.empty .ic{font-size:40px;margin-bottom:12px;opacity:.25;}
+.empty h3{font-family:'Orbitron',monospace;font-size:12px;color:var(--text3);margin-bottom:7px;letter-spacing:2px;}
+.empty p{font-size:11px;color:var(--text3);line-height:1.9;}
+.chi{position:absolute;background:rgba(9,15,23,.95);border:1px solid var(--border);border-radius:3px;padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);pointer-events:none;display:none;white-space:nowrap;z-index:10;}
+
+/* RIGHT */
+.rp{width:235px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.tbar{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:7px 3px;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:1px;text-align:center;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;transition:all .2s;text-transform:uppercase;}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.tab:hover{color:var(--text);}
+.tc{flex:1;overflow-y:auto;display:none;flex-direction:column;min-height:0;}
+.tc.on{display:flex;}
+.tc::-webkit-scrollbar{width:2px;}
+.tc::-webkit-scrollbar-thumb{background:var(--border);}
+
+.sitem{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:10px;margin-bottom:6px;cursor:pointer;transition:all .2s;}
+.sitem:hover{border-color:var(--accent);background:rgba(0,212,255,.05);}
+.sitem .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.sitem .snum{font-family:'Orbitron',monospace;font-size:10px;color:var(--accent);}
+.sitem .sdate{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);}
+.sitem .sstats{display:flex;gap:8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2);}
+.sitem .spnl{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;}
+.sitem .sdel{font-size:10px;padding:2px 6px;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;border-radius:2px;}
+.sitem .sdel:hover{border-color:var(--red);color:var(--red);}border-bottom:1px solid rgba(26,58,92,.4);font-size:10px;animation:fi .3s ease;cursor:pointer;transition:background .2s;}
+.je:hover{background:rgba(0,212,255,.05);}
+.je.selected{background:rgba(0,212,255,.08);border-left:2px solid var(--accent);}
+.je-review-hint{font-size:9px;color:var(--text3);margin-top:3px;font-style:italic;}
+.jh{display:flex;justify-content:space-between;margin-bottom:3px;}
+.jn{font-family:'Orbitron',monospace;font-size:8px;color:var(--text3);}
+.jt2{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text3);}
+.jdb{color:var(--green);font-weight:700;}
+.jds{color:var(--red);font-weight:700;}
+.jdet{font-family:'Share Tech Mono',monospace;color:var(--text2);margin:2px 0;font-size:9px;}
+.jpnl{font-family:'Share Tech Mono',monospace;font-weight:700;font-size:11px;}
+.jpnl.p{color:var(--green);}
+.jpnl.n{color:var(--red);}
+.es{padding:16px 10px;text-align:center;color:var(--text3);font-size:10px;line-height:1.9;}
+
+.cop{padding:8px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1;min-height:0;}
+.cop::-webkit-scrollbar{width:2px;}
+.cop::-webkit-scrollbar-thumb{background:var(--border);}
+.cm{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:3px;padding:8px;font-size:11px;line-height:1.6;color:var(--text);animation:fi .4s ease;flex-shrink:0;}
+.cm.w{border-left-color:var(--warn);}
+.cm.g{border-left-color:var(--green);}
+.cm.d{border-left-color:var(--red);}
+.cl{font-family:'Orbitron',monospace;font-size:7px;letter-spacing:2px;color:var(--accent);margin-bottom:4px;text-transform:uppercase;}
+.cl.w{color:var(--warn);}
+.cl.g{color:var(--green);}
+.cl.d{color:var(--red);}
+.acw{padding:8px;border-top:1px solid var(--border);flex-shrink:0;}
+.aci{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:11px;padding:5px 7px;border-radius:3px;outline:none;margin-bottom:5px;resize:none;height:46px;}
+.aci:focus{border-color:var(--accent);}
+@keyframes dots{0%,100%{content:'.'}33%{content:'..'}66%{content:'...'}}
+.ld::after{content:'...';animation:dots 1.5s infinite;}
+
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);flex-shrink:0;}
+.sbox{background:var(--panel);padding:8px;text-align:center;}
+.sv2{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--accent);display:block;margin-bottom:2px;}
+.sv2.g{color:var(--green);}
+.sv2.r{color:var(--red);}
+.sl2{font-size:8px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;}
+.ew{padding:10px;flex:1;display:flex;flex-direction:column;}
+.ew .pt{margin-bottom:6px;}
+
+.stb{display:flex;align-items:center;gap:12px;padding:3px 12px;background:var(--bg2);border-top:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3);flex-shrink:0;}
+.sd{width:5px;height:5px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:4px;}
+.sd.a{background:var(--green);box-shadow:0 0 4px var(--green);animation:pu 1.5s infinite;}
+.sd.t{background:var(--warn);box-shadow:0 0 4px var(--warn);animation:pu 1s infinite;}
+@keyframes pu{0%,100%{opacity:1}50%{opacity:.4}}
+
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:600;}
+.mo.show{display:flex;}
+.md{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:20px;width:360px;max-width:92vw;}
+.md h3{font-family:'Orbitron',monospace;font-size:12px;color:var(--accent);margin-bottom:11px;letter-spacing:2px;}
+.md p{font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:7px;}
+.md .mb{display:flex;gap:6px;margin-top:12px;justify-content:flex-end;}
+.na{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:12px;padding:7px;border-radius:3px;resize:none;height:72px;outline:none;margin-top:6px;}
+.na:focus{border-color:var(--accent);}
+@keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">V75 <span>REPLAY</span> COACH</div>
+  <div class="topbar-stats">
+    <div class="pill"><span class="lbl">BALANCE</span><span class="ac" id="bal">$1,000.00</span></div>
+    <div class="pill"><span class="lbl">EQUITY</span><span class="ac" id="equ">$1,000.00</span></div>
+    <div class="pill"><span class="lbl">P&L</span><span id="pnld" class="ac">$0.00</span></div>
+    <div class="pill"><span class="lbl">TRADES</span><span class="ac" id="trd">0</span></div>
+    <div class="pill"><span class="lbl">W / L</span><span class="ac" id="wl">0 / 0</span></div>
+  </div>
+  <div class="topbar-right">
+    <div class="tog" onclick="toggleCoach()"><div class="tsw on" id="tsw"></div><span id="tlbl">COACH ON</span></div>
+    <button class="btn" onclick="resetSession()">RESET</button>
+  </div>
+</div>
+
+<input type="file" id="fi-all" accept=".csv" multiple style="display:none" onchange="loadAllFiles(event)">
+<input type="file" id="fi-1D"  accept=".csv" style="display:none" onchange="loadTF('1D',event)">
+<input type="file" id="fi-4H"  accept=".csv" style="display:none" onchange="loadTF('4H',event)">
+<input type="file" id="fi-1H"  accept=".csv" style="display:none" onchange="loadTF('1H',event)">
+<input type="file" id="fi-15M" accept=".csv" style="display:none" onchange="loadTF('15M',event)">
+<input type="file" id="fi-5M"  accept=".csv" style="display:none" onchange="loadTF('5M',event)">
+
+<!-- Drag drop overlay -->
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-icon">📂</div>
+  <div class="drop-text">DROP YOUR CSV FILES</div>
+  <div class="drop-sub">All 5 timeframes at once — auto-detected by filename</div>
+</div>
+
+<div class="main">
+  <div class="lp">
+
+    <div class="ps">
+      <div class="pt">Timeframes</div>
+      <button class="load-all-btn" onclick="document.getElementById('fi-all').click()">⬆ LOAD ALL CSVs</button>
+      <div class="tf-grid">
+        <div class="tf-btn" id="tfb-1D"  onclick="switchTF('1D')">1D</div>
+        <div class="tf-btn" id="tfb-4H"  onclick="switchTF('4H')">4H</div>
+        <div class="tf-btn" id="tfb-1H"  onclick="switchTF('1H')">1H</div>
+        <div class="tf-btn" id="tfb-15M" onclick="switchTF('15M')">15M</div>
+        <div class="tf-btn" id="tfb-5M"  onclick="switchTF('5M')">5M</div>
+      </div>
+      <div class="load-list">
+        <div class="load-item" id="li-1D" ><span class="lname" id="ln-1D" >1D</span> <button class="lbtn" onclick="document.getElementById('fi-1D').click()">LOAD</button></div>
+        <div class="load-item" id="li-4H" ><span class="lname" id="ln-4H" >4H</span> <button class="lbtn" onclick="document.getElementById('fi-4H').click()">LOAD</button></div>
+        <div class="load-item" id="li-1H" ><span class="lname" id="ln-1H" >1H</span> <button class="lbtn" onclick="document.getElementById('fi-1H').click()">LOAD</button></div>
+        <div class="load-item" id="li-15M"><span class="lname" id="ln-15M">15M</span><button class="lbtn" onclick="document.getElementById('fi-15M').click()">LOAD</button></div>
+        <div class="load-item" id="li-5M" ><span class="lname" id="ln-5M" >5M</span> <button class="lbtn" onclick="document.getElementById('fi-5M').click()">LOAD</button></div>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="pt">Replay</div>
+      <div class="rc">
+        <div class="date-jump-wrap">
+          <label>Start from date</label>
+          <div class="date-jump-row">
+            <select id="jumpMonth" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 4px;border-radius:3px;outline:none;flex:1;">
+              <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option>
+              <option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option>
+              <option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option>
+              <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+            </select>
+            <select id="jumpDay" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 4px;border-radius:3px;outline:none;flex:1;"></select>
+            <select id="jumpYear" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 4px;border-radius:3px;outline:none;flex:1;"></select>
+          </div>
+          <div class="date-jump-row" style="margin-top:4px;">
+            <button class="dj-btn" onclick="jumpToDate()" style="flex:1">GO</button>
+            <button class="dj-btn rnd" onclick="jumpRandom()" style="flex:1">🎲 RANDOM DATE</button>
+            <button class="dj-btn rnd" onclick="toggleCandleSelect()" id="select-btn-side" style="flex:1">⊙ BAR SELECT</button>
+          </div>
+        </div>
+        <div class="sr"><label>Speed</label><input type="range" min="1" max="20" value="5" id="spd" oninput="updSpd(this.value)"><span class="sv" id="spdv">5x</span></div>
+        <div class="rb">
+          <button class="btn p" id="pb"   onclick="togglePlay()" disabled>▶ PLAY</button>
+          <button class="btn"   id="stpb" onclick="stepOne()"   disabled>▶|</button>
+        </div>
+        <div class="pg" id="rpg">— / —</div>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="pt">Execute Trade</div>
+      <div class="lr"><label>Lot Size</label><input type="number" id="lot" value="0.05" min="0.01" max="10" step="0.01" oninput="chkLot()"></div>
+      <div class="lw" id="lw">⚠️ Above recommended 0.05 max!</div>
+      <div class="lr"><label>SL (pts)</label><input type="number" id="slp" value="200" min="0" step="1" oninput="onSLInput()"></div>
+      <div class="lr"><label>TP (pts)</label><input type="number" id="tpp" value="800" min="0" step="1" oninput="onTPInput()"></div>
+      <div class="tb">
+        <button class="sb2" onclick="openTrade('SELL')" id="sb3" disabled>▼ SELL</button>
+        <button class="bb"  onclick="openTrade('BUY')"  id="bb2" disabled>▲ BUY</button>
+      </div>
+      <button class="cbt" onclick="closeTrade()" id="cb2" disabled>✕ CLOSE TRADE</button>
+    </div>
+
+    <div class="ps" style="flex:1">
+      <div class="pt">Open Position</div>
+      <div id="pos"><div class="np">No open position</div></div>
+      <div class="drag-hint" id="drag-hint" style="display:none">Drag SL/TP lines on chart</div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="ca">
+    <div class="ctb">
+      <span style="font-family:'Orbitron',monospace;font-size:9px;letter-spacing:1px;color:var(--accent)" id="cur-tf">—</span>
+      <span style="width:1px;height:12px;background:var(--border)"></span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text3)" id="cur-dt">—</span>
+      <span style="width:1px;height:12px;background:var(--border)"></span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text2)" id="ohlc-info"></span>
+      <button id="jump-btn" onclick="jumpToLatest()" style="display:none;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;padding:3px 10px;border:1px solid var(--warn);background:rgba(255,204,0,.1);color:var(--warn);cursor:pointer;border-radius:3px;letter-spacing:.5px;animation:pu 1s infinite">↓ LATEST</button>
+      <button id="mode-btn" onclick="toggleChartMode()" style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;padding:3px 10px;border:1px solid var(--green);background:rgba(0,255,136,.08);color:var(--green);cursor:pointer;border-radius:3px;letter-spacing:.5px;transition:all .2s" title="Switch between Auto-follow and Free movement">FOLLOW</button>
+      <button onclick="openDebrief()" style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;padding:3px 10px;border:1px solid var(--accent);background:rgba(0,212,255,.08);color:var(--accent);cursor:pointer;border-radius:3px;letter-spacing:.5px;transition:all .2s;" title="Post-session debrief with Claude" onmouseover="this.style.background='rgba(0,212,255,.2)'" onmouseout="this.style.background='rgba(0,212,255,.08)'">🧠 DEBRIEF</button>
+      <div style="display:flex;align-items:center;gap:5px;margin-left:6px;" title="Right margin — move latest candle away from edge">
+        <span style="font-size:9px;color:var(--text3);font-family:'Share Tech Mono',monospace;white-space:nowrap">⇥</span>
+        <input type="range" min="0" max="40" value="8" id="rightSpaceSlider" oninput="rightSpace=parseInt(this.value);reqDraw()" style="width:60px;accent-color:var(--accent);cursor:pointer;height:3px;">
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;margin-left:2px;" title="Vertical margin — breathing room above and below candles">
+        <span style="font-size:9px;color:var(--text3);font-family:'Share Tech Mono',monospace;white-space:nowrap">↕</span>
+        <input type="range" min="2" max="40" value="12" id="vertSpaceSlider" oninput="vertSpace=parseInt(this.value);reqDraw()" style="width:60px;accent-color:var(--accent);cursor:pointer;height:3px;">
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <div class="price-big" id="prd">—</div>
+        <span class="price-chg" id="pc2"></span>
+      </div>
+    </div>
+    <div class="cw">
+      <canvas id="cvs"></canvas>
+      <div class="empty" id="empty">
+        <div class="ic">📈</div>
+        <h3>Load Your V75 Data</h3>
+        <p>Click <b style="color:var(--accent)">LOAD ALL CSVs</b> to load<br>all timeframes at once.<br><br>Or drag &amp; drop your CSV<br>files anywhere on screen.<br><br>🖱 Scroll = Zoom<br>🖱 Drag SL/TP lines</p>
+      </div>
+      <div class="chi" id="chi"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="rp">
+    <div class="tbar">
+      <div class="tab on" onclick="swTab('coach')">COACH</div>
+      <div class="tab"    onclick="swTab('journal')">JOURNAL</div>
+      <div class="tab"    onclick="swTab('stats')">STATS</div>
+      <div class="tab"    onclick="swTab('sessions')">SESSIONS</div>
+    </div>
+
+    <div class="tc on" id="tc-coach">
+      <div class="cop" id="cop">
+        <div class="cm"><div class="cl">COACH</div>Load your V75 CSVs and start the replay. All timeframes sync to the same date when you switch.<br><br>You can drag SL and TP lines directly on the chart to adjust them. Mute me anytime. 🔇</div>
+        <div id="cms" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+      <div class="acw">
+        <div style="margin-bottom:6px;">
+          <input type="password" id="apiKey" placeholder="Paste your Anthropic API key (sk-ant-...)" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:6px 8px;border-radius:3px;outline:none;">
+          <div style="font-size:9px;color:var(--text3);margin-top:3px;">Get your key at console.anthropic.com → API Keys</div>
+        </div>
+        <textarea class="aci" id="aci" placeholder="Ask your coach anything..."></textarea>
+        <button class="btn p" style="width:100%;font-size:11px" onclick="askCoach()">ASK COACH</button>
+      </div>
+    </div>
+
+    <div class="tc" id="tc-journal">
+      <div id="jl" style="flex:1;overflow-y:auto;min-height:0;">
+        <div class="es">No trades yet.<br>Your journal starts<br>with your first trade.</div>
+      </div>
+    </div>
+
+    <div class="tc" id="tc-stats">
+      <div class="sg">
+        <div class="sbox"><span class="sv2 g" id="sw">0</span><span class="sl2">Wins</span></div>
+        <div class="sbox"><span class="sv2 r" id="sl3">0</span><span class="sl2">Losses</span></div>
+        <div class="sbox"><span class="sv2" id="swr">0%</span><span class="sl2">Win Rate</span></div>
+        <div class="sbox"><span class="sv2" id="srr">—</span><span class="sl2">Avg RR</span></div>
+        <div class="sbox"><span class="sv2 g" id="sbw">$0</span><span class="sl2">Best Win</span></div>
+        <div class="sbox"><span class="sv2 r" id="swl">$0</span><span class="sl2">Worst Loss</span></div>
+        <div class="sbox"><span class="sv2" id="sst">—</span><span class="sl2">Streak</span></div>
+        <div class="sbox"><span class="sv2" id="sap">$0</span><span class="sl2">Avg P&L</span></div>
+      </div>
+      <div class="ew"><div class="pt">EQUITY CURVE</div><canvas id="ec"></canvas></div>
+      <div style="padding:10px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;">
+        <button onclick="openDebrief()" style="flex:2;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;padding:9px;border:1px solid var(--accent);background:rgba(0,212,255,.08);color:var(--accent);cursor:pointer;border-radius:3px;" onmouseover="this.style.background='rgba(0,212,255,.18)'" onmouseout="this.style.background='rgba(0,212,255,.08)'">🧠 DEBRIEF</button>
+        <button onclick="saveCurrentSession()" style="flex:1;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;padding:9px;border:1px solid var(--green);background:rgba(0,255,136,.08);color:var(--green);cursor:pointer;border-radius:3px;" onmouseover="this.style.background='rgba(0,255,136,.2)'" onmouseout="this.style.background='rgba(0,255,136,.08)'">💾 SAVE</button>
+        <button onclick="exportTradesCSV()" style="flex:1;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;padding:9px;border:1px solid var(--text3);background:transparent;color:var(--text3);cursor:pointer;border-radius:3px;" onmouseover="this.style.color='var(--green)';this.style.borderColor='var(--green)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--text3)'">↓ CSV</button>
+        <button onclick="clearSavedTrades()" style="flex:1;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;padding:9px;border:1px solid var(--text3);background:transparent;color:var(--text3);cursor:pointer;border-radius:3px;" onmouseover="this.style.color='var(--red)';this.style.borderColor='var(--red)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--text3)'">✕</button>
+      </div>
+    </div>
+
+    <!-- SESSIONS TAB -->
+    <div class="tc" id="tc-sessions">
+      <div style="padding:10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;align-items:center;">
+        <span style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text3);letter-spacing:1px;flex:1">SAVED SESSIONS</span>
+        <button onclick="saveCurrentSession()" style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:10px;padding:4px 10px;border:1px solid var(--green);background:rgba(0,255,136,.08);color:var(--green);cursor:pointer;border-radius:3px;letter-spacing:.5px;">💾 SAVE SESSION</button>
+      </div>
+      <div id="sessionList" style="flex:1;overflow-y:auto;min-height:0;padding:6px;">
+        <div class="es">No saved sessions yet.<br>Complete a session and<br>click 💾 SAVE SESSION.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stb">
+  <span><span class="sd" id="std"></span><span id="stt">IDLE — Load a timeframe CSV to begin</span></span>
+  <span id="cc2">—</span>
+  <span id="st2">Session: 00:00</span>
+  <span style="margin-left:auto;color:var(--green)">V75 REPLAY COACH v7.0</span>
+</div>
+
+<!-- DEBRIEF MODAL -->
+<div class="mo" id="debriefMo" style="z-index:700;">
+  <div class="md" style="width:520px;max-height:85vh;display:flex;flex-direction:column;">
+    <h3>🧠 POST-SESSION DEBRIEF</h3>
+    <div id="debriefContent" style="flex:1;overflow-y:auto;min-height:0;">
+      <div id="debriefLoading" style="text-align:center;padding:30px;color:var(--text2);">
+        <div style="font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;color:var(--accent);margin-bottom:12px;">ANALYSING YOUR SESSION...</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text3)">Sending your trades to Claude<span class="ld"></span></div>
+      </div>
+      <div id="debriefResult" style="display:none;font-size:12px;line-height:1.8;color:var(--text);white-space:pre-wrap;font-family:'Rajdhani',sans-serif;"></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-shrink:0;">
+      <button class="btn" onclick="closeDebrief()" style="flex:1">CLOSE</button>
+      <button class="btn p" onclick="openDebrief()" style="flex:1" id="debriefRetryBtn">REFRESH</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="mo">
+  <div class="md">
+    <h3>CLOSE TRADE</h3>
+    <p>What did you see? Add a note about your reasoning.</p>
+    <textarea class="na" id="tn" placeholder="e.g. Rejection at resistance, engulfing candle, momentum fading..."></textarea>
+    <div class="mb">
+      <button class="btn" onclick="dismissModal()">CANCEL</button>
+      <button class="btn s" onclick="confirmClose()">CONFIRM CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const TFS = ['1D','4H','1H','15M','5M'];
+const tfData = {};
+let activeTF   = null;
+let masterTime = null;   // unix ms — the shared "current time" across all TFs
+let playing    = false, piv = null, speed = 5;
+let bal=100000, eq=100000;
+let curTrade=null, trades=[], eqHist=[100000];
+let tradeCnt=0, sesTimer=0, sesIv=null, coachOn=true;
+let cvs, ctx, eqChart=null;
+let zoom=80, hov=null, raf=null;
+let panOffset=0;
+let autoFollow=true;
+let chartMode='auto';
+let rightSpace=8;
+let vertSpace=12;
+let candleSelectMode=false; // when true clicking a candle sets replay start point
+let isPanning=false, panStartX=0, panStartOffset=0;
+let reviewTradeId = null; // id of trade being reviewed on chart
+
+// SL/TP drag state
+let draggingLine = null;   // 'sl' | 'tp' | null
+let dragStartY   = 0;
+let dragStartVal = 0;
+
+// Cached chart geometry for hit-testing
+let chartGeo = { TP:14, BP:24, RP:66, cH:0, mn:0, mx:0 };
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+window.onload = () => {
+  cvs = document.getElementById('cvs');
+  ctx = cvs.getContext('2d');
+  resize();
+  window.addEventListener('resize', () => { resize(); reqDraw(); });
+  cvs.addEventListener('mousemove',  onMM);
+  cvs.addEventListener('mouseleave', onML);
+  cvs.addEventListener('mousedown',  onMD);
+  window.addEventListener('mouseup', onMU);
+  cvs.addEventListener('wheel', onWheel, { passive: false });
+  // Safari trackpad gesture events
+  cvs.addEventListener('gesturestart',  onGestureStart,  { passive: false });
+  cvs.addEventListener('gesturechange', onGestureChange, { passive: false });
+  cvs.addEventListener('gestureend',    onGestureEnd,    { passive: false });  initEqChart();
+  initDragDrop();
+  initDateDropdowns();
+  loadFromGitHub();
+  renderSessionList();
+  sesIv = setInterval(() => {
+    sesTimer++;
+    const m=String(Math.floor(sesTimer/60)).padStart(2,'0');
+    const s=String(sesTimer%60).padStart(2,'0');
+    document.getElementById('st2').textContent=`Session: ${m}:${s}`;
+  }, 1000);
+};
+
+function resize(){
+  cvs.width  = cvs.parentElement.clientWidth;
+  cvs.height = cvs.parentElement.clientHeight;
+}
+function reqDraw(){
+  if(raf) cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(draw);
+}
+
+// ═══════════════════════════════════════════
+// AUTO-DETECT TF FROM FILENAME
+// ═══════════════════════════════════════════
+function detectTFFromName(fname){
+  const f = fname.toLowerCase();
+  // Standard format: _1D, _4H, _1H, _15M, _5M
+  if(f.includes('_1d') || f.includes('_d1') || f.endsWith('d1.csv')) return '1D';
+  if(f.includes('_4h') || f.includes('_h4') || f.endsWith('h4.csv')) return '4H';
+  if(f.includes('_1h') || f.includes('_h1') || f.endsWith('h1.csv')) return '1H';
+  if(f.includes('_15m') || f.includes('_m15') || f.endsWith('m15.csv')) return '15M';
+  if(f.includes('_5m')  || f.includes('_m5')  || f.endsWith('m5.csv'))  return '5M';
+  // Fallback — any occurrence
+  if(f.includes('d1') || f.includes('1d')) return '1D';
+  if(f.includes('h4') || f.includes('4h')) return '4H';
+  if(f.includes('h1') || f.includes('1h')) return '1H';
+  if(f.includes('m15') || f.includes('15m')) return '15M';
+  if(f.includes('m5')  || f.includes('5m'))  return '5M';
+  return null;
+}
+
+// ═══════════════════════════════════════════
+// LOAD ALL FILES (multi-picker)
+// ═══════════════════════════════════════════
+function loadAllFiles(e){
+  const files = Array.from(e.target.files);
+  if(!files.length) return;
+  let matched=0, unmatched=[];
+  files.forEach(file=>{
+    const tf = detectTFFromName(file.name);
+    if(tf){
+      matched++;
+      const r=new FileReader();
+      r.onload=ev=>parseCSV(tf, ev.target.result, file.name);
+      r.readAsText(file);
+    } else {
+      unmatched.push(file.name);
+    }
+  });
+  if(unmatched.length){
+    addMsg(`Could not detect TF for: ${unmatched.join(', ')}. Make sure filenames contain 1D, 4H, 1H, 15M or 5M.`,'warn');
+  }
+  e.target.value='';
+}
+
+// ═══════════════════════════════════════════
+// DRAG AND DROP
+// ═══════════════════════════════════════════
+function initDragDrop(){
+  const body = document.body;
+  body.addEventListener('dragenter', e=>{
+    e.preventDefault();
+    document.getElementById('dropOverlay').classList.add('active');
+  });
+  body.addEventListener('dragover', e=>{ e.preventDefault(); });
+  body.addEventListener('dragleave', e=>{
+    // Only hide if leaving the window entirely
+    if(e.clientX===0 && e.clientY===0 || e.relatedTarget===null){
+      document.getElementById('dropOverlay').classList.remove('active');
+    }
+  });
+  body.addEventListener('drop', e=>{
+    e.preventDefault();
+    document.getElementById('dropOverlay').classList.remove('active');
+    const files = Array.from(e.dataTransfer.files).filter(f=>f.name.toLowerCase().endsWith('.csv'));
+    if(!files.length){ addMsg('No CSV files detected in drop.','warn'); return; }
+    let matched=0, unmatched=[];
+    files.forEach(file=>{
+      const tf=detectTFFromName(file.name);
+      if(tf){
+        matched++;
+        const r=new FileReader();
+        r.onload=ev=>parseCSV(tf, ev.target.result, file.name);
+        r.readAsText(file);
+      } else {
+        unmatched.push(file.name);
+      }
+    });
+    addMsg(`${matched} file${matched!==1?'s':''} dropped and loading...${unmatched.length?'\n\nCould not detect TF for: '+unmatched.join(', '):''}`, matched>0?'info':'warn');
+  });
+}
+
+// ═══════════════════════════════════════════
+// PERSISTENCE — save/load trades via localStorage
+// ═══════════════════════════════════════════
+function saveTrades(){
+  try{
+    localStorage.setItem('v75_trades', JSON.stringify(trades));
+    localStorage.setItem('v75_bal', bal.toFixed(2));
+    localStorage.setItem('v75_eqHist', JSON.stringify(eqHist));
+    localStorage.setItem('v75_tradeCnt', tradeCnt);
+  }catch(e){ console.log('Save error:', e); }
+}
+
+function loadTrades(){
+  try{
+    const saved = localStorage.getItem('v75_trades');
+    if(!saved) return;
+    const loaded = JSON.parse(saved);
+    if(!loaded || !loaded.length) return;
+    trades = loaded;
+    bal    = parseFloat(localStorage.getItem('v75_bal')||'1000');
+    eq     = bal;
+    eqHist = JSON.parse(localStorage.getItem('v75_eqHist')||'[1000]');
+    tradeCnt = parseInt(localStorage.getItem('v75_tradeCnt')||'0');
+    // Rebuild journal
+    document.getElementById('jl').innerHTML='';
+    trades.forEach(t => addJEntry(t));
+    updStats(); updBal();
+    addMsg(`Loaded ${trades.length} saved trades from your last session.`, 'info');
+  }catch(e){ console.log('Load error:', e); }
+}
+
+function exportTradesCSV(){
+  if(!trades.length){ addMsg('No trades to export.','warn'); return; }
+  const rows=['#,Direction,TF,Time,Entry,Exit,Points,PnL,Reason,Note'];
+  trades.forEach(t=>{
+    rows.push([t.id,t.dir,t.tf,t.time,t.ep.toFixed(4),t.cp.toFixed(4),t.pips.toFixed(1),(t.pnl>=0?'+':'')+t.pnl.toFixed(2),t.reason,t.note||''].join(','));
+  });
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`V75_Trades_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  addMsg('Trades exported as CSV.','info');
+}
+function clearSavedTrades(){
+  if(!confirm('Clear all saved trade history? This cannot be undone.')) return;
+  localStorage.removeItem('v75_trades');
+  localStorage.removeItem('v75_bal');
+  localStorage.removeItem('v75_eqHist');
+  localStorage.removeItem('v75_tradeCnt');
+  trades=[]; bal=100000; eq=100000; eqHist=[100000]; tradeCnt=0;
+  document.getElementById('jl').innerHTML='<div class="es">No trades yet.<br>Your journal starts<br>with your first trade.</div>';
+  updStats(); updBal();
+  addMsg('Trade history cleared.', 'warn');
+}
+function clearCSVCache(){
+  TFS.forEach(tf=>{
+    localStorage.removeItem('v75_compact_'+tf);
+    localStorage.removeItem('v75_csv_'+tf);
+  });
+  localStorage.removeItem('v75_compact_loaded');
+  localStorage.removeItem('v75_csv_loaded');
+  addMsg('CSV cache cleared — reload your CSV files to refresh data.','warn');
+}
+// ═══════════════════════════════════════════
+// GITHUB AUTO-LOAD
+// Fetches CSVs from GitHub if not already loaded
+// ═══════════════════════════════════════════
+const GITHUB_BASE = 'https://raw.githubusercontent.com/princefranklin-stack/v75-data/main/vix752/';
+const GITHUB_FILES = {
+  '1D':  'VIX75_D1.csv',
+  '4H':  'VIX75_H4.csv',
+  '1H':  'VIX75_H1.csv',
+  '15M': 'VIX75_M15.csv',
+  '5M':  'VIX75_M5.csv',
+};
+
+async function loadFromGitHub(){
+  // Only fetch TFs not already loaded from cache
+  const toLoad = TFS.filter(tf => !tfData[tf]);
+  if(!toLoad.length){
+    addMsg('All timeframes loaded from cache ✓', 'info');
+    return;
+  }
+
+  addMsg(`Fetching ${toLoad.length} timeframe${toLoad.length>1?'s':''} from GitHub...`, 'info');
+
+  for(const tf of toLoad){
+    try{
+      const url = GITHUB_BASE + GITHUB_FILES[tf];
+      const res  = await fetch(url);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const txt  = await res.text();
+      parseCSV(tf, txt, GITHUB_FILES[tf]);
+    }catch(e){
+      console.log('GitHub fetch failed for '+tf+':', e.message);
+    }
+  }
+}
+// Saves parsed candle arrays not raw CSV text
+// ═══════════════════════════════════════════
+function saveCSVCache(tf, txt){ /* raw CSV too large — use saveCompactTF instead */ }
+
+function saveCompactTF(tf){
+  if(!tfData[tf]) return;
+  const candles = tfData[tf].candles;
+  try{
+    // Compact: array of [time,o,h,l,c,dt]
+    const compact = candles.map(c=>[c.time,c.o,c.h,c.l,c.c,c.dt||'']);
+    const str = JSON.stringify(compact);
+    localStorage.setItem('v75_compact_'+tf, str);
+    const loaded = JSON.parse(localStorage.getItem('v75_compact_loaded')||'[]');
+    if(!loaded.includes(tf)){ loaded.push(tf); localStorage.setItem('v75_compact_loaded', JSON.stringify(loaded)); }
+    console.log('Saved '+tf+': '+candles.length+' candles (~'+Math.round(str.length/1024)+'KB)');
+  }catch(e){
+    console.log('Cannot cache '+tf+' — storage full ('+e.message+')');
+  }
+}
+
+function loadCSVCache(){
+  try{
+    const loaded = JSON.parse(localStorage.getItem('v75_compact_loaded')||'[]');
+    if(!loaded.length) return;
+    let count = 0;
+    loaded.forEach(tf=>{
+      try{
+        const str = localStorage.getItem('v75_compact_'+tf);
+        if(!str) return;
+        const compact = JSON.parse(str);
+        if(!compact||compact.length<5) return;
+        const candles = compact.map(c=>({time:c[0],o:c[1],h:c[2],l:c[3],c:c[4],dt:c[5]||''}));
+        tfData[tf] = {candles, idx:0};
+        document.getElementById('tfb-'+tf).classList.add('loaded');
+        document.getElementById('li-'+tf).classList.add('ok');
+        const ln=document.getElementById('ln-'+tf);
+        ln.className='lname ok';
+        ln.textContent=`${tf} ✓ ${candles.length.toLocaleString()}`;
+        document.getElementById('li-'+tf).querySelector('.lbtn').className='lbtn ok';
+        document.getElementById('li-'+tf).querySelector('.lbtn').textContent='✓';
+        if(masterTime===null){
+          masterTime=candles[candles.length-1].time;
+          document.getElementById('jumpDate').value=new Date(candles[0].time).toISOString().split('T')[0];
+        }
+        if(!activeTF) switchTF(tf);
+        count++;
+      }catch(e){ console.log('Error loading '+tf+':', e.message); }
+    });
+    if(count>0){
+      syncAllTFs();
+      addMsg(`Auto-loaded ${count} cached timeframe${count>1?'s':''} from last session ✓`,'info');
+    }
+  }catch(e){ console.log('Cache load error:', e); }
+}
+
+function loadTF(tf, e){
+  const file=e.target.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload = ev => parseCSV(tf, ev.target.result, file.name);
+  r.readAsText(file);
+  e.target.value='';
+}
+
+function parseCSV(tf, txt, fname){
+  const lines = txt.trim().split('\n');
+  if(lines.length<2){ alert('File empty.'); return; }
+  const hdr = lines[0].toLowerCase().replace(/\r/g,'').split(',');
+  const iO=hdr.indexOf('open'), iH=hdr.indexOf('high');
+  const iL=hdr.indexOf('low'),  iC=hdr.indexOf('close');
+  const iDt=hdr.indexOf('datetime')!==-1?hdr.indexOf('datetime'):0;
+  const iTs=hdr.indexOf('timestamp');
+  if(iO<0||iH<0||iL<0||iC<0){ alert('No OHLC columns found.'); return; }
+
+  const candles=[];
+  for(let i=1;i<lines.length;i++){
+    const p=lines[i].replace(/\r/g,'').split(',');
+    if(p.length<=iC) continue;
+    const o=parseFloat(p[iO]),h=parseFloat(p[iH]),l=parseFloat(p[iL]),c=parseFloat(p[iC]);
+    if(isNaN(o)||isNaN(h)||isNaN(l)||isNaN(c)) continue;
+    // Parse timestamp — prefer the 'timestamp' column (unix seconds)
+    let ts;
+    if(iTs>-1){ ts=parseInt(p[iTs])*1000; }
+    else {
+      const dt=new Date(p[iDt]?p[iDt].trim():'');
+      ts=isNaN(dt)?i*60000:dt.getTime();
+    }
+    candles.push({ time:ts, dt:p[iDt]?p[iDt].trim():'', o, h, l, c });
+  }
+  if(candles.length<5){ alert('Not enough candles.'); return; }
+  candles.sort((a,b)=>a.time-b.time);
+
+  tfData[tf] = { candles, idx:0 };
+
+  // Update UI
+  document.getElementById('tfb-'+tf).classList.add('loaded');
+  document.getElementById('li-'+tf).classList.add('ok');
+  const ln=document.getElementById('ln-'+tf);
+  ln.className='lname ok';
+  ln.textContent=`${tf} ✓ ${candles.length.toLocaleString()}`;
+  const lb=document.getElementById('li-'+tf).querySelector('.lbtn');
+  lb.className='lbtn ok'; lb.textContent='✓';
+
+  // Set master time if this is the first TF loaded
+  if(masterTime===null){
+    // Start at END of data so all candles visible immediately for zoom/drag
+    masterTime = candles[candles.length-1].time; // already in ms
+    // Set jump date input to beginning of data as default replay start
+    const dt = new Date(candles[0].time).toISOString().split('T')[0];
+    setJumpDateValue(dt);
+  }
+  // Sync this TF's idx to the current masterTime
+  syncTFToMaster(tf);
+
+  addMsg(`${tf} loaded — ${candles.length.toLocaleString()} candles. Date range: ${candles[0].dt} → ${candles[candles.length-1].dt}`, 'info');
+
+  if(!activeTF) switchTF(tf);
+  else refreshUI();
+}
+
+// ═══════════════════════════════════════════
+// SYNC — find correct idx for a TF given masterTime
+// idx = number of candles to show (all candles whose time <= masterTime)
+// ═══════════════════════════════════════════
+function syncTFToMaster(tf){
+  if(!tfData[tf]) return;
+  const candles = tfData[tf].candles;
+  // Binary search: find last candle index where candle.time <= masterTime
+  let lo=0, hi=candles.length-1, best=-1;
+  while(lo<=hi){
+    const mid=(lo+hi)>>1;
+    if(candles[mid].time <= masterTime){ best=mid; lo=mid+1; }
+    else hi=mid-1;
+  }
+  // idx = number of candles to reveal = best+1 (or 0 if none found yet)
+  tfData[tf].idx = best>=0 ? best+1 : 0;
+}
+
+function syncAllTFs(){
+  TFS.forEach(tf=>{ if(tfData[tf]) syncTFToMaster(tf); });
+}
+
+// ═══════════════════════════════════════════
+// DATE JUMP
+// ═══════════════════════════════════════════
+function initDateDropdowns(){
+  // Populate days 1-31
+  const dayEl = document.getElementById('jumpDay');
+  for(let d=1;d<=31;d++){
+    const o=document.createElement('option');
+    o.value=String(d).padStart(2,'0');
+    o.textContent=String(d).padStart(2,'0');
+    dayEl.appendChild(o);
+  }
+  // Populate years 2016-current
+  const yearEl = document.getElementById('jumpYear');
+  const curYear = new Date().getFullYear();
+  for(let y=curYear;y>=2016;y--){
+    const o=document.createElement('option');
+    o.value=y; o.textContent=y;
+    yearEl.appendChild(o);
+  }
+  // Default to today
+  const now = new Date();
+  document.getElementById('jumpMonth').value = String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('jumpDay').value   = String(now.getDate()).padStart(2,'0');
+  document.getElementById('jumpYear').value  = now.getFullYear();
+}
+
+function getJumpDateValue(){
+  const m = document.getElementById('jumpMonth').value;
+  const d = document.getElementById('jumpDay').value;
+  const y = document.getElementById('jumpYear').value;
+  return `${y}-${m}-${d}`;
+}
+
+function setJumpDateValue(dateStr){
+  // dateStr = YYYY-MM-DD
+  if(!dateStr || dateStr.length < 10) return;
+  const parts = dateStr.split('-');
+  if(parts.length < 3) return;
+  document.getElementById('jumpYear').value  = parts[0];
+  document.getElementById('jumpMonth').value = parts[1];
+  document.getElementById('jumpDay').value   = parts[2];
+}
+
+function jumpToDate(){
+  const val = getJumpDateValue();
+  if(!val){ addMsg('Pick a date first.','warn'); return; }
+  if(!activeTF||!tfData[activeTF]){ addMsg('Load a CSV first.','warn'); return; }
+
+  const targetMs = new Date(val+'T00:00:00Z').getTime();
+  const d = tfData[activeTF];
+
+  if(targetMs < d.candles[0].time){
+    addMsg(`${val} is before your data starts (${d.candles[0].dt}).`,'warn'); return;
+  }
+  if(targetMs > d.candles[d.candles.length-1].time){
+    addMsg(`${val} is after your data ends.`,'warn'); return;
+  }
+
+  masterTime = targetMs;
+  TFS.forEach(tf=>{ if(tfData[tf]) syncTFToMaster(tf); });
+
+  // Ensure active TF has at least 1 candle shown
+  if(tfData[activeTF].idx < 1) tfData[activeTF].idx = 1;
+
+  panOffset=0; autoFollow=true;
+  if(playing) togglePlay(); // pause replay on jump
+
+  refreshUI(); reqDraw();
+  addMsg(`Jumped to ${val}. Zoom/drag freely, then press Play to replay forward from here.`,'info');
+}
+
+function jumpRandom(){
+  if(!activeTF||!tfData[activeTF]){ addMsg('Load a CSV first.','warn'); return; }
+  const d = tfData[activeTF];
+  if(d.candles.length < 10) return;
+
+  // Pick random index in first 70% of data so there's plenty ahead to replay
+  const minIdx = Math.floor(d.candles.length * 0.02);
+  const maxIdx = Math.floor(d.candles.length * 0.7);
+  const randIdx = minIdx + Math.floor(Math.random() * (maxIdx - minIdx));
+
+  masterTime = d.candles[randIdx].time; // already ms
+  TFS.forEach(tf=>{ if(tfData[tf]) syncTFToMaster(tf); });
+  if(tfData[activeTF].idx < 1) tfData[activeTF].idx = 1;
+
+  const dt = new Date(masterTime).toISOString().split('T')[0];
+  setJumpDateValue(dt);
+
+  panOffset=0; autoFollow=true;
+  if(playing) togglePlay();
+
+  refreshUI(); reqDraw();
+  addMsg(`Random jump to ${dt}. You have no idea what's coming next 😏 Press Play when ready.`,'info');
+}
+// ═══════════════════════════════════════════
+function switchTF(tf){
+  if(!tfData[tf]){
+    addMsg(`${tf} not loaded yet.`,'warn');
+    return;
+  }
+  activeTF = tf;
+  // Keep panOffset but clamp to valid range for new TF
+  const d=tfData[tf];
+  const ns=Math.min(zoom,d.idx);
+  panOffset=Math.max(0,Math.min(d.idx-ns,panOffset));
+  autoFollow=(panOffset===0);
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tfb-'+tf).classList.add('active');
+  document.getElementById('empty').style.display='none';
+  document.getElementById('pb').disabled=false;
+  document.getElementById('stpb').disabled=false;
+  document.getElementById('bb2').disabled=false;
+  document.getElementById('sb3').disabled=false;
+  document.getElementById('std').className='sd a';
+  refreshUI();
+  reqDraw();
+}
+
+function toggleChartMode(){
+  chartMode = chartMode==='auto' ? 'free' : 'auto';
+  const btn = document.getElementById('mode-btn');
+  if(chartMode==='auto'){
+    btn.textContent = 'FOLLOW';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.background  = 'rgba(0,255,136,.08)';
+    btn.style.color       = 'var(--green)';
+    panOffset=0; autoFollow=true;
+    document.getElementById('jump-btn').style.display='none';
+  } else {
+    btn.textContent = 'FREE';
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.background  = 'rgba(0,212,255,.08)';
+    btn.style.color       = 'var(--accent)';
+    autoFollow=false;
+  }
+  reqDraw();
+}
+
+function jumpToLatest(){
+  panOffset=0;
+  autoFollow=true;
+  document.getElementById('jump-btn').style.display='none';
+  reqDraw();
+}
+
+function refreshUI(){
+  if(!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  document.getElementById('cur-tf').textContent=activeTF+' · V75';
+  document.getElementById('rpg').textContent=`${d.idx} / ${d.candles.length}`;
+  document.getElementById('cc2').textContent=`${d.idx.toLocaleString()} / ${d.candles.length.toLocaleString()} candles`;
+  document.getElementById('stt').textContent=`${activeTF} active — ${masterTime?new Date(masterTime).toISOString().substring(0,16).replace('T',' '):''}`;  document.getElementById('jump-btn').style.display=(panOffset>0 && chartMode==='auto')?'block':'none';
+}
+
+// ═══════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════
+function draw(){
+  if(!ctx||!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  const W=cvs.width, H=cvs.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#050a0f'; ctx.fillRect(0,0,W,H);
+  if(d.idx<1) return;
+
+  const RP=66, TP=14, BP=24;
+  const cW=W-RP, cH=H-TP-BP;
+
+  // Window: total slots = zoom + rightSpace, rightSpace slots are empty on the right
+  // This pushes the latest candle away from the right edge
+  const totalSlots = zoom + rightSpace;
+  const ns = Math.min(zoom, d.idx);         // actual candles to draw
+  const latestEnd = d.idx;
+  const windowEnd = Math.max(ns, latestEnd - panOffset);
+  const sI = Math.max(0, windowEnd - ns);
+  const win = d.candles.slice(sI, sI + ns);
+  if(!win.length) return;
+
+  // Slot width based on total slots (candles + empty right space)
+  const sw = cW / totalSlots;
+  const bw = Math.max(1.5, sw * 0.68);
+
+  // Price range
+  let mn=Infinity, mx=-Infinity;
+  win.forEach(c=>{ mn=Math.min(mn,c.l); mx=Math.max(mx,c.h); });
+  // Also include SL/TP in range so they're always visible
+  if(curTrade && curTrade.tf===activeTF){
+    mn=Math.min(mn,curTrade.sl,curTrade.tp);
+    mx=Math.max(mx,curTrade.sl,curTrade.tp);
+  }
+  const pr=mx-mn||1, py=pr*(vertSpace/100);
+  mn-=py; mx+=py;
+
+  // Cache geometry for drag hit-testing
+  chartGeo={TP,BP,RP,cH,cW,mn,mx,W,H};
+
+  const toY = p => TP+cH-((p-mn)/(mx-mn))*cH;
+  const toP = y => mn+((TP+cH-y)/(cH))*(mx-mn);
+
+  // Grid
+  for(let i=0;i<=6;i++){
+    const y=TP+(cH/6)*i;
+    ctx.strokeStyle='rgba(26,58,92,.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cW,y); ctx.stroke();
+    const pv=mx-((mx-mn)/6)*i;
+    ctx.fillStyle='rgba(106,154,184,.5)'; ctx.font='9px Share Tech Mono'; ctx.textAlign='left';
+    ctx.fillText(pv.toFixed(2),cW+3,y+3);
+  }
+
+  // Time labels
+  const le=Math.max(1,Math.floor(ns/5));
+  win.forEach((c,i)=>{
+    if(i%le===0&&c.dt){
+      const x=i*sw+sw/2;
+      ctx.strokeStyle='rgba(26,58,92,.15)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(x,TP); ctx.lineTo(x,TP+cH); ctx.stroke();
+      ctx.fillStyle='rgba(58,106,138,.65)'; ctx.font='8px Share Tech Mono'; ctx.textAlign='center';
+      const lb=c.dt.length>10?c.dt.substring(5,16):c.dt;
+      ctx.fillText(lb,x,H-BP+12);
+    }
+  });
+
+  // Candles
+  win.forEach((c,i)=>{
+    const x=i*sw+sw/2, up=c.c>=c.o;
+    // Hover column highlight
+    if(hov===sI+i){
+      ctx.fillStyle = candleSelectMode
+        ? 'rgba(255,204,0,.15)'   // yellow in select mode
+        : 'rgba(0,212,255,.05)';  // blue normally
+      ctx.fillRect(i*sw,TP,sw,cH);
+    }
+    ctx.strokeStyle=up?'#00c97a':'#ff3355'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,toY(c.h)); ctx.lineTo(x,toY(c.l)); ctx.stroke();
+    const bt=toY(Math.max(c.o,c.c)), bb2=toY(Math.min(c.o,c.c)), bh=Math.max(1,bb2-bt);
+    ctx.fillStyle=up?'rgba(0,201,122,.88)':'rgba(255,51,85,.88)';
+    ctx.fillRect(x-bw/2,bt,bw,bh);
+  });
+
+  // Trade markers (closed) — shown on ALL TFs using timestamps
+  trades.forEach(t=>{
+    const eIdx = t.eTime ? findCandleIdxByTime(activeTF, t.eTime) : -1;
+    const cIdx = t.cTime ? findCandleIdxByTime(activeTF, t.cTime) : -1;
+    if(eIdx < 0) return;
+
+    const ei=eIdx-sI, ci=cIdx-sI;
+    const isReview = reviewTradeId===t.id;
+
+    // Entry dot — use t.ep for Y (same price regardless of TF)
+    if(ei>=0 && ei<ns){
+      const ex=ei*sw+sw/2;
+      // Only draw if price is in visible range
+      const ey=toY(t.ep);
+      if(ey>=TP && ey<=TP+cH){
+        if(isReview && ci>=0 && ci<ns){
+          const cx2=ci*sw+sw/2;
+          ctx.fillStyle=t.pnl>=0?'rgba(0,255,136,.07)':'rgba(255,51,85,.07)';
+          ctx.fillRect(Math.min(ex,cx2)-sw/2,TP,Math.abs(cx2-ex)+sw,cH);
+        }
+        ctx.fillStyle=t.dir==='BUY'?'#00ff88':'#ff3355';
+        const r=isReview?7:4;
+        ctx.beginPath(); ctx.arc(ex,ey,r,0,Math.PI*2); ctx.fill();
+        if(isReview){
+          ctx.fillStyle=t.dir==='BUY'?'rgba(0,255,136,.9)':'rgba(255,51,85,.9)';
+          ctx.fillRect(ex-22,ey-(t.dir==='BUY'?22:8),44,14);
+          ctx.fillStyle='#050a0f'; ctx.font='bold 8px Share Tech Mono'; ctx.textAlign='center';
+          ctx.fillText('ENTRY',ex,ey-(t.dir==='BUY'?12:0));
+          ctx.strokeStyle=t.dir==='BUY'?'rgba(0,255,136,.3)':'rgba(255,51,85,.3)';
+          ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(0,ey); ctx.lineTo(cW,ey); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
+    // Exit dot — use t.cp for Y
+    if(ci>=0 && ci<ns && t.cp!==undefined){
+      const cx2=ci*sw+sw/2;
+      const cy3=toY(t.cp);
+      if(cy3>=TP && cy3<=TP+cH){
+        const r=isReview?7:3.5;
+        ctx.strokeStyle=t.pnl>=0?'#00ff88':'#ff3355';
+        ctx.lineWidth=isReview?2.5:1.5;
+        ctx.beginPath(); ctx.arc(cx2,cy3,r,0,Math.PI*2); ctx.stroke();
+        if(isReview){
+          ctx.fillStyle=t.pnl>=0?'rgba(0,255,136,.9)':'rgba(255,51,85,.9)';
+          ctx.fillRect(cx2-16,cy3+8,32,14);
+          ctx.fillStyle='#050a0f'; ctx.font='bold 8px Share Tech Mono'; ctx.textAlign='center';
+          ctx.fillText('EXIT',cx2,cy3+18);
+          const pnlStr=(t.pnl>=0?'+':'')+t.pnl.toFixed(2);
+          const bw2=pnlStr.length*7+10;
+          ctx.fillStyle=t.pnl>=0?'rgba(0,255,136,.85)':'rgba(255,51,85,.85)';
+          ctx.fillRect(cx2-bw2/2,cy3-30,bw2,16);
+          ctx.fillStyle='#050a0f'; ctx.font='bold 9px Orbitron'; ctx.textAlign='center';
+          ctx.fillText(pnlStr,cx2,cy3-18);
+          ctx.strokeStyle=t.pnl>=0?'rgba(0,255,136,.3)':'rgba(255,51,85,.3)';
+          ctx.lineWidth=1; ctx.setLineDash([3,3]);
+          ctx.beginPath(); ctx.moveTo(0,cy3); ctx.lineTo(cW,cy3); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+  });
+
+  // Open trade: entry + SL + TP lines — visible on ALL timeframes
+  // Dragging only works on the trade's own TF, but lines show everywhere
+  if(curTrade){
+    const ey=toY(curTrade.ep), sy=toY(curTrade.sl), ty=toY(curTrade.tp);
+    const onTradeTF = curTrade.tf===activeTF; // dragging only on trade's TF
+
+    // Entry line
+    ctx.setLineDash([4,4]); ctx.lineWidth=1.2;
+    ctx.strokeStyle=curTrade.dir==='BUY'?'rgba(0,255,136,.6)':'rgba(255,51,85,.6)';
+    ctx.beginPath(); ctx.moveTo(0,ey); ctx.lineTo(cW,ey); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // SL line
+    const slHover = draggingLine==='sl' || (Math.abs(cvs._mouseY - sy) < 10);
+    ctx.lineWidth = slHover ? 2.5 : 1.5;
+    ctx.strokeStyle = slHover ? '#ff3355' : 'rgba(255,51,85,.7)';
+    ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(cW,sy); ctx.stroke();
+    // SL label badge
+    ctx.fillStyle='rgba(255,51,85,.85)'; ctx.fillRect(cW-55,sy-8,55,16);
+    ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono'; ctx.textAlign='center';
+    ctx.fillText('SL '+curTrade.sl.toFixed(2),cW-27,sy+3);
+    // SL estimated loss
+    const slPips = curTrade.dir==='BUY' ? curTrade.sl-curTrade.ep : curTrade.ep-curTrade.sl;
+    const slLoss = slPips * 10 * curTrade.lot;
+    const slStr = '$'+slLoss.toFixed(2);
+    const slBw = slStr.length*7+8;
+    ctx.fillStyle='rgba(255,51,85,.75)'; ctx.fillRect(4,sy+1,slBw,13);
+    ctx.fillStyle='#fff'; ctx.font='bold 8px Share Tech Mono'; ctx.textAlign='left';
+    ctx.fillText(slStr,8,sy+11);
+    // Drag handle — show on all TFs
+    ctx.fillStyle=slHover?'#ff3355':'rgba(255,51,85,.5)';
+    ctx.fillRect(4+slBw+2,sy-6,10,12); ctx.fillStyle='#050a0f';
+    ctx.fillRect(6+slBw+2,sy-3,6,2); ctx.fillRect(6+slBw+2,sy+1,6,2);
+
+    // TP line
+    const tpHover = draggingLine==='tp' || (Math.abs(cvs._mouseY - ty) < 10);
+    ctx.lineWidth = tpHover ? 2.5 : 1.5;
+    ctx.strokeStyle = tpHover ? '#00ff88' : 'rgba(0,255,136,.7)';
+    ctx.beginPath(); ctx.moveTo(0,ty); ctx.lineTo(cW,ty); ctx.stroke();
+    // TP label badge
+    ctx.fillStyle='rgba(0,255,136,.85)'; ctx.fillRect(cW-55,ty-8,55,16);
+    ctx.fillStyle='#050a0f'; ctx.font='bold 9px Share Tech Mono'; ctx.textAlign='center';
+    ctx.fillText('TP '+curTrade.tp.toFixed(2),cW-27,ty+3);
+    // TP estimated profit
+    const tpPips = curTrade.dir==='BUY' ? curTrade.tp-curTrade.ep : curTrade.ep-curTrade.tp;
+    const tpProfit = tpPips * 10 * curTrade.lot;
+    const tpStr = '+$'+tpProfit.toFixed(2);
+    const tpBw = tpStr.length*7+8;
+    ctx.fillStyle='rgba(0,255,136,.75)'; ctx.fillRect(4,ty-12,tpBw,13);
+    ctx.fillStyle='#050a0f'; ctx.font='bold 8px Share Tech Mono'; ctx.textAlign='left';
+    ctx.fillText(tpStr,8,ty-2);
+    // Drag handle — show on all TFs
+    ctx.fillStyle=tpHover?'#00ff88':'rgba(0,255,136,.5)';
+    ctx.fillRect(4+tpBw+2,ty-6,10,12); ctx.fillStyle='#050a0f';
+    ctx.fillRect(6+tpBw+2,ty-3,6,2); ctx.fillRect(6+tpBw+2,ty+1,6,2);
+
+    // PnL preview — always use trade's own TF for live price
+    const tradeTFData = tfData[curTrade.tf];
+    const livePrice = tradeTFData && tradeTFData.idx>0
+      ? tradeTFData.candles[tradeTFData.idx-1].c
+      : curTrade.ep;
+    const pips=curTrade.dir==='BUY'?livePrice-curTrade.ep:curTrade.ep-livePrice;
+    const pnl=pips*10*curTrade.lot;
+    const pnlCol=pnl>=0?'rgba(0,255,136,.8)':'rgba(255,51,85,.8)';
+    ctx.fillStyle=pnlCol; ctx.font='bold 11px Orbitron'; ctx.textAlign='right';
+    ctx.fillText((pnl>=0?'+':'')+pnl.toFixed(2), cW-60, ey+(curTrade.dir==='BUY'?-5:14));
+
+    // TF indicator when viewing different TF from trade
+    if(!onTradeTF){
+      ctx.fillStyle='rgba(255,204,0,.7)'; ctx.font='bold 9px Share Tech Mono'; ctx.textAlign='left';
+      ctx.fillText('TRADE ON '+curTrade.tf, 16, ey-6);
+    }
+  }
+
+  // ── FULL CROSSHAIR at actual mouse position ──
+  if(mouseX>=0 && mouseY>=TP && mouseY<=TP+cH && !isPanning){
+    const crossPrice = mn+((TP+cH-mouseY)/cH)*(mx-mn);
+
+    ctx.save();
+    ctx.strokeStyle='rgba(0,212,255,.35)';
+    ctx.lineWidth=1;
+    ctx.setLineDash([4,4]);
+
+    // Vertical line
+    ctx.beginPath(); ctx.moveTo(mouseX,TP); ctx.lineTo(mouseX,TP+cH); ctx.stroke();
+    // Horizontal line — full width including price axis
+    ctx.beginPath(); ctx.moveTo(0,mouseY); ctx.lineTo(W,mouseY); ctx.stroke();
+
+    ctx.setLineDash([]);
+
+    // Price label on right axis
+    ctx.fillStyle='rgba(0,212,255,.85)';
+    ctx.fillRect(cW, mouseY-8, RP, 16);
+    ctx.fillStyle='#050a0f';
+    ctx.font='bold 9px Share Tech Mono';
+    ctx.textAlign='center';
+    ctx.fillText(crossPrice.toFixed(2), cW+RP/2, mouseY+3);
+
+    ctx.restore();
+  }
+
+  // Current price badge
+  const lc=d.candles[d.idx-1];
+  if(lc){
+    const cp=lc.c, cy=toY(cp);
+    ctx.strokeStyle='rgba(0,212,255,.4)'; ctx.lineWidth=1; ctx.setLineDash([2,4]);
+    ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(cW,cy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=lc.c>=lc.o?'#00c97a':'#ff3355';
+    ctx.fillRect(cW,cy-7,RP,15);
+    ctx.fillStyle='#050a0f'; ctx.font='bold 9px Share Tech Mono'; ctx.textAlign='center';
+    ctx.fillText(cp.toFixed(2),cW+RP/2,cy+3);
+    document.getElementById('prd').textContent=cp.toFixed(4);
+    document.getElementById('cur-dt').textContent=lc.dt||'';
+    if(d.idx>1){
+      const prev=d.candles[d.idx-2].c, diff=cp-prev, pct=(diff/prev*100).toFixed(2);
+      const pe=document.getElementById('pc2');
+      pe.textContent=`${diff>=0?'+':''}${diff.toFixed(2)} (${diff>=0?'+':''}${pct}%)`;
+      pe.style.color=diff>=0?'var(--green)':'var(--red)';
+    }
+  }
+  refreshUI();
+}
+
+// ═══════════════════════════════════════════
+// MOUSE — pan + SL/TP drag + hover
+// ═══════════════════════════════════════════
+function getLineAtY(y){
+  if(!curTrade) return null; // allow drag on ALL timeframes
+  if(!chartGeo || chartGeo.mn===undefined) return null;
+  const {TP,cH,mn,mx}=chartGeo;
+  const toY=p=>TP+cH-((p-mn)/(mx-mn))*cH;
+  // Only detect if price is within visible chart range
+  const slY=toY(curTrade.sl), tpY=toY(curTrade.tp);
+  if(slY>=TP && slY<=TP+cH && Math.abs(y-slY)<10) return 'sl';
+  if(tpY>=TP && tpY<=TP+cH && Math.abs(y-tpY)<10) return 'tp';
+  return null;
+}
+
+function onMM(e){
+  const rect=cvs.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+  mouseX=x; mouseY=y;
+  cvs._mouseY=y;
+
+  // SL/TP dragging
+  if(draggingLine){
+    const {TP,cH,mn,mx}=chartGeo;
+    const newPrice=mn+((TP+cH-y)/cH)*(mx-mn);
+    if(draggingLine==='sl'){
+      curTrade.sl=parseFloat(newPrice.toFixed(4));
+      const slPts=curTrade.dir==='BUY'?curTrade.ep-curTrade.sl:curTrade.sl-curTrade.ep;
+      document.getElementById('slp').value=Math.max(0,slPts).toFixed(0);
+    } else {
+      curTrade.tp=parseFloat(newPrice.toFixed(4));
+      const tpPts=curTrade.dir==='BUY'?curTrade.tp-curTrade.ep:curTrade.ep-curTrade.tp;
+      document.getElementById('tpp').value=Math.max(0,tpPts).toFixed(0);
+    }
+    updPosDsp(); reqDraw(); return;
+  }
+
+  // Chart panning — drag RIGHT = look further back (increase panOffset)
+  if(isPanning){
+    if(!activeTF||!tfData[activeTF]) return;
+    const d=tfData[activeTF];
+    const cW=cvs.width-66;
+    const ns=Math.min(zoom,d.idx);
+    const sw=cW/(zoom+rightSpace);
+    const moved=Math.round((x-panStartX)/sw);
+    panOffset=Math.max(0, Math.min(d.idx-ns, panStartOffset+moved));
+    if(chartMode==='auto'){
+      autoFollow=(panOffset===0);
+      // Show LATEST button when panned away in AUTO mode
+    } else {
+      autoFollow=false;
+    }
+    reqDraw(); return;
+  }
+
+  // Cursor style
+  const line=getLineAtY(y);
+  if(candleSelectMode){
+    cvs.style.cursor='crosshair';
+  } else {
+    cvs.style.cursor=line?'ns-resize':'crosshair';
+  }
+
+  // Hover candle OHLC
+  if(!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  const cW=cvs.width-66;
+  const ns=Math.min(zoom,d.idx);
+  const latestEnd=d.idx;
+  const windowEnd=Math.max(ns,latestEnd-panOffset);
+  const sI=Math.max(0,windowEnd-ns);
+  const sw=cW/(zoom+rightSpace);
+  const i=Math.floor(x/sw);
+  if(i>=0&&i<ns&&sI+i<d.idx){
+    hov=sI+i;
+    const c=d.candles[hov];
+    if(c){
+      const chi=document.getElementById('chi');
+      chi.style.display='block';
+      chi.style.left=Math.min(x+10,cvs.width-225)+'px';
+      chi.style.top=Math.min(y+10,cvs.height-50)+'px';
+      chi.innerHTML=`${c.dt}<br>O:${c.o.toFixed(2)}  H:${c.h.toFixed(2)}  L:${c.l.toFixed(2)}  C:${c.c.toFixed(2)}`;
+      document.getElementById('ohlc-info').textContent=`O:${c.o.toFixed(2)} H:${c.h.toFixed(2)} L:${c.l.toFixed(2)} C:${c.c.toFixed(2)}`;
+    }
+  } else { hov=null; }
+  reqDraw();
+}
+
+function onML(){
+  document.getElementById('chi').style.display='none';
+  document.getElementById('ohlc-info').textContent='';
+  hov=null; mouseX=-1; mouseY=-1;
+  if(!isPanning) cvs.style.cursor='crosshair';
+  reqDraw();
+}
+
+function toggleCandleSelect(){
+  candleSelectMode = !candleSelectMode;
+  const btn = document.getElementById('select-btn-side');
+  if(candleSelectMode){
+    btn.style.borderColor = 'var(--warn)';
+    btn.style.background  = 'rgba(255,204,0,.15)';
+    btn.style.color       = 'var(--warn)';
+    btn.textContent       = '⊙ SELECTING...';
+    cvs.style.cursor      = 'crosshair';
+    addMsg('Click any candle on the chart to set your replay start point.','info');
+  } else {
+    btn.style.borderColor = '';
+    btn.style.background  = '';
+    btn.style.color       = '';
+    btn.textContent       = '⊙ BAR SELECT';
+    cvs.style.cursor      = 'crosshair';
+  }
+}
+
+function onMD(e){
+  const rect=cvs.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+
+  // Candle select mode — click to set replay start
+  if(candleSelectMode){
+    if(!activeTF||!tfData[activeTF]) return;
+    const d=tfData[activeTF];
+    const cW=cvs.width-66;
+    const totalSlots=zoom+rightSpace;
+    const ns=Math.min(zoom,d.idx);
+    const latestEnd=d.idx;
+    const windowEnd=Math.max(ns,latestEnd-panOffset);
+    const sI=Math.max(0,windowEnd-ns);
+    const sw=cW/totalSlots;
+    const i=Math.floor(x/sw);
+    if(i>=0 && i<ns && sI+i<d.idx){
+      const candle = d.candles[sI+i];
+      masterTime = candle.time;
+      TFS.forEach(tf=>{ if(tfData[tf]) syncTFToMaster(tf); });
+      if(tfData[activeTF].idx < 1) tfData[activeTF].idx = 1;
+      // Update date input
+      const dt = new Date(candle.time).toISOString().split('T')[0];
+      setJumpDateValue(dt);
+      panOffset=0; autoFollow=true;
+      if(playing) togglePlay();
+      // Exit select mode
+      candleSelectMode=false;
+      const btn=document.getElementById('select-btn-side');
+      if(btn){ btn.style.borderColor=''; btn.style.background=''; btn.style.color=''; btn.textContent='⊙ BAR SELECT'; }
+      refreshUI(); reqDraw();
+      addMsg(`Start point set to ${candle.dt||dt}. Press Play to replay from here.`,'info');
+    }
+    return;
+  }
+
+  const line=getLineAtY(y);
+  if(line){
+    draggingLine=line; cvs.style.cursor='ns-resize';
+  } else {
+    isPanning=true; panStartX=x;
+    panStartOffset=panOffset;
+    cvs.style.cursor='grabbing';
+  }
+}
+
+function onMU(){
+  draggingLine=null;
+  isPanning=false;
+  cvs.style.cursor='crosshair';
+  reqDraw();
+}
+
+let gestureStartZoom = 80;
+
+function onWheel(e){
+  e.preventDefault();
+  if(!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  const rect=cvs.getBoundingClientRect();
+  const mouseX=e.clientX-rect.left;
+  const cW=cvs.width-66;
+  const oldNs=Math.min(zoom,d.idx);
+  const frac=Math.max(0,Math.min(1,mouseX/cW));
+
+  let delta;
+  if(e.ctrlKey){
+    // Trackpad pinch — ctrlKey is set, deltaY is the pinch amount
+    // Positive deltaY = pinch in (zoom in = fewer candles)
+    // Negative deltaY = pinch out (zoom out = more candles)
+    delta = e.deltaY > 0 ? 3 : -3;
+  } else {
+    // Regular scroll wheel — zoom in/out
+    delta = e.deltaY > 0 ? 5 : -5;
+  }
+
+  zoom=Math.max(5,Math.min(500,zoom+delta));
+  const newNs=Math.min(zoom,d.idx);
+  const candleShift=Math.round((newNs-oldNs)*frac);
+  panOffset=Math.max(0,Math.min(d.idx-newNs,panOffset-candleShift));
+  autoFollow=(chartMode==='auto'&&panOffset===0);
+  reqDraw();
+}
+
+// Safari-specific gesture events (fired on Mac trackpad pinch in Safari)
+function onGestureStart(e){
+  e.preventDefault();
+  gestureStartZoom = zoom;
+}
+
+function onGestureChange(e){
+  e.preventDefault();
+  if(!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  // e.scale > 1 = spreading fingers = zoom in (fewer candles)
+  // e.scale < 1 = pinching = zoom out (more candles)
+  const rect=cvs.getBoundingClientRect();
+  const mouseX=e.clientX-rect.left;
+  const cW=cvs.width-66;
+  const frac=Math.max(0,Math.min(1,mouseX/cW));
+  const oldNs=Math.min(zoom,d.idx);
+
+  zoom=Math.max(5,Math.min(500,Math.round(gestureStartZoom/e.scale)));
+
+  const newNs=Math.min(zoom,d.idx);
+  const candleShift=Math.round((newNs-oldNs)*frac);
+  panOffset=Math.max(0,Math.min(d.idx-newNs,panOffset-candleShift));
+  autoFollow=(chartMode==='auto'&&panOffset===0);
+  reqDraw();
+}
+
+function onGestureEnd(e){
+  e.preventDefault();
+}
+
+// ═══════════════════════════════════════════
+// INPUT-DRIVEN SL/TP UPDATE
+// ═══════════════════════════════════════════
+function onSLInput(){
+  if(!curTrade) return;
+  const pts=parseFloat(document.getElementById('slp').value)||0;
+  curTrade.sl=curTrade.dir==='BUY'?curTrade.ep-pts:curTrade.ep+pts;
+  updPosDsp(); reqDraw();
+}
+function onTPInput(){
+  if(!curTrade) return;
+  const pts=parseFloat(document.getElementById('tpp').value)||0;
+  curTrade.tp=curTrade.dir==='BUY'?curTrade.ep+pts:curTrade.ep-pts;
+  updPosDsp(); reqDraw();
+}
+
+// ═══════════════════════════════════════════
+// REPLAY
+// ═══════════════════════════════════════════
+function togglePlay(){
+  if(!activeTF) return;
+  playing=!playing;
+  const b=document.getElementById('pb');
+  if(playing){
+    b.textContent='⏸ PAUSE'; b.className='btn w';
+    document.getElementById('stt').textContent='REPLAYING...';
+    runReplay();
+  } else {
+    b.textContent='▶ PLAY'; b.className='btn p';
+    document.getElementById('stt').textContent='PAUSED';
+    clearInterval(piv);
+  }
+}
+
+function runReplay(){
+  clearInterval(piv);
+  piv=setInterval(()=>{
+    if(!activeTF||!tfData[activeTF]) return;
+    const d=tfData[activeTF];
+    if(d.idx>=d.candles.length){
+      togglePlay();
+      addMsg('Replay complete on '+activeTF+'! 📊','good');
+      return;
+    }
+    advance();
+  },Math.max(40,1000/speed));
+}
+
+function stepOne(){
+  if(!activeTF||!tfData[activeTF]) return;
+  if(tfData[activeTF].idx>=tfData[activeTF].candles.length) return;
+  advance();
+}
+
+function advance(){
+  const d=tfData[activeTF];
+  masterTime = d.candles[d.idx].time;
+  d.idx++;
+  TFS.forEach(tf=>{ if(tf!==activeTF&&tfData[tf]) syncTFToMaster(tf); });
+  // AUTO mode — always snap to latest on every new candle like MT5 mobile
+  // FREE mode — never move the chart, replay runs in background
+  if(chartMode==='auto'){
+    panOffset=0;
+    autoFollow=true;
+  }
+  updPosDsp();
+  chkSLTP();
+  reqDraw();
+}
+
+function updSpd(v){
+  speed=parseInt(v);
+  document.getElementById('spdv').textContent=v+'x';
+  if(playing){ clearInterval(piv); runReplay(); }
+}
+
+// ═══════════════════════════════════════════
+// TRADING
+// ═══════════════════════════════════════════
+function chkLot(){
+  const l=parseFloat(document.getElementById('lot').value);
+  document.getElementById('lw').style.display=l>0.05?'block':'none';
+}
+
+function openTrade(dir){
+  if(!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  if(d.idx<1) return;
+  if(curTrade){ addMsg('Close current position first.','warn'); return; }
+  const price=d.candles[d.idx-1].c;
+  const lot=parseFloat(document.getElementById('lot').value);
+  const slPts=parseFloat(document.getElementById('slp').value);
+  const tpPts=parseFloat(document.getElementById('tpp').value);
+  curTrade={
+    dir, ep:price, eI:d.idx-1, eTime:d.candles[d.idx-1].time, lot, tf:activeTF,
+    sl: dir==='BUY'?price-slPts:price+slPts,
+    tp: dir==='BUY'?price+tpPts:price-tpPts,
+    ot: d.candles[d.idx-1].dt||new Date().toLocaleTimeString()
+  };
+  tradeCnt++;
+  document.getElementById('cb2').disabled=false;
+  document.getElementById('drag-hint').style.display='block';
+  document.getElementById('std').className='sd t';
+  document.getElementById('stt').textContent=`${dir} open @ ${price.toFixed(4)} [${activeTF}]`;
+  reqDraw();
+  if(coachOn){
+    const lw=lot>0.05?`\n\n⚠️ Lot ${lot} is above the recommended 0.05 max.`:'';
+    addMsg(`${dir} entered @ ${price.toFixed(4)} on ${activeTF}. Lot: ${lot}.\nSL: ${curTrade.sl.toFixed(4)} | TP: ${curTrade.tp.toFixed(4)}\n\nDrag SL/TP lines on chart to adjust.${lw}`,lot>0.05?'warn':'info');
+  }
+}
+
+function closeTrade(){
+  if(!curTrade) return;
+  if(playing) togglePlay();
+  document.getElementById('mo').classList.add('show');
+}
+function dismissModal(){
+  document.getElementById('mo').classList.remove('show');
+  document.getElementById('tn').value='';
+}
+function confirmClose(){
+  const note=document.getElementById('tn').value.trim();
+  dismissModal();
+  execClose('MANUAL',note);
+}
+
+function execClose(reason,note=''){
+  if(!curTrade||!activeTF||!tfData[activeTF]) return;
+  const d=tfData[activeTF];
+  if(d.idx<1) return;
+  const price=d.candles[d.idx-1].c;
+  const pips=curTrade.dir==='BUY'?price-curTrade.ep:curTrade.ep-price;
+  const pnl=pips*10*curTrade.lot;
+  bal+=pnl; eq=bal;
+  eqHist.push(parseFloat(bal.toFixed(2)));
+  const tradeTFData = tfData[curTrade.tf];
+  const closeTFData = tradeTFData && tradeTFData.idx>0 ? tradeTFData : tfData[activeTF];
+  const closeCandle = closeTFData.candles[closeTFData.idx-1];
+  const t={id:tradeCnt,dir:curTrade.dir,ep:curTrade.ep,cp:price,
+    eI:curTrade.eI,cI:closeTFData.idx-1,
+    eTime:curTrade.eTime, cTime:closeCandle.time,
+    lot:curTrade.lot,pnl,pips,reason,note,
+    time:curTrade.ot,tf:curTrade.tf};
+  trades.push(t);
+  curTrade=null;
+  document.getElementById('cb2').disabled=true;
+  document.getElementById('drag-hint').style.display='none';
+  document.getElementById('pos').innerHTML='<div class="np">No open position</div>';
+  document.getElementById('std').className='sd a';
+  document.getElementById('stt').textContent=`Closed ${reason} — ${pnl>=0?'+':''}$${pnl.toFixed(2)}`;
+  updBal(); updStats(); addJEntry(t); saveTrades(); reqDraw();
+  if(coachOn){
+    const w=pnl>0;
+    let msg=w
+      ?`✅ +$${pnl.toFixed(2)}. ${reason==='TP'?'TP hit — good execution.':'Good close.'}`
+      :`❌ -$${Math.abs(pnl).toFixed(2)}. ${reason==='SL'?'SL hit. Stay disciplined.':'Early close — was it planned?'}`;
+    if(note) msg+=`\n\n"${note}"`;
+    addMsg(msg,w?'good':'warn');
+  }
+}
+
+function chkSLTP(){
+  if(!curTrade) return;
+  // FIXED: always check against the trade's own TF candles
+  // not activeTF — so switching TF doesn't break SL/TP detection
+  const tradeTF = curTrade.tf;
+  if(!tfData[tradeTF]) return;
+  const d = tfData[tradeTF];
+  if(d.idx < 1) return;
+  const c = d.candles[d.idx-1];
+  if(curTrade.dir==='BUY'){
+    if(c.l<=curTrade.sl){ execClose('SL'); return; }
+    if(c.h>=curTrade.tp){ execClose('TP'); return; }
+  } else {
+    if(c.h>=curTrade.sl){ execClose('SL'); return; }
+    if(c.l<=curTrade.tp){ execClose('TP'); return; }
+  }
+}
+
+function updPosDsp(){
+  if(!curTrade) return;
+  const tradeTF = curTrade.tf;
+  if(!tfData[tradeTF]) return;
+  const d = tfData[tradeTF];
+  if(d.idx<1) return;
+  const price=d.candles[d.idx-1].c;
+  const pips=curTrade.dir==='BUY'?price-curTrade.ep:curTrade.ep-price;
+  const pnl=pips*10*curTrade.lot;
+  eq=bal+pnl; updBal();
+  const pc=pnl>=0?'pp':'pn';
+  const slPts=curTrade.dir==='BUY'?curTrade.ep-curTrade.sl:curTrade.sl-curTrade.ep;
+  const tpPts=curTrade.dir==='BUY'?curTrade.tp-curTrade.ep:curTrade.ep-curTrade.tp;
+  document.getElementById('pos').innerHTML=`<div class="pd">
+    <div class="pr"><span class="pl">DIR</span><span style="color:${curTrade.dir==='BUY'?'var(--green)':'var(--red)'};font-weight:700">${curTrade.dir}</span></div>
+    <div class="pr"><span class="pl">TF</span><span>${curTrade.tf}</span></div>
+    <div class="pr"><span class="pl">ENTRY</span><span>${curTrade.ep.toFixed(4)}</span></div>
+    <div class="pr"><span class="pl">PRICE</span><span>${price.toFixed(4)}</span></div>
+    <div class="pr"><span class="pl">LOT</span><span>${curTrade.lot}</span></div>
+    <div class="pr"><span class="pl">SL</span><span style="color:var(--red)">${curTrade.sl.toFixed(4)} <span style="color:var(--text3)">(${slPts.toFixed(0)}pts)</span></span></div>
+    <div class="pr"><span class="pl">TP</span><span style="color:var(--green)">${curTrade.tp.toFixed(4)} <span style="color:var(--text3)">(${tpPts.toFixed(0)}pts)</span></span></div>
+    <div class="pr"><span class="pl">P&L</span><span class="${pc}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</span></div>
+  </div>`;
+}
+
+function updBal(){
+  const tp=bal-1000;
+  document.getElementById('bal').textContent='$'+bal.toFixed(2);
+  document.getElementById('equ').textContent='$'+eq.toFixed(2);
+  const pe=document.getElementById('pnld');
+  pe.textContent=(tp>=0?'+':'')+' $'+tp.toFixed(2);
+  pe.className=tp>=0?'ag':'ar';
+  document.getElementById('trd').textContent=trades.length;
+  const w=trades.filter(t=>t.pnl>0).length, l=trades.filter(t=>t.pnl<=0).length;
+  document.getElementById('wl').textContent=`${w} / ${l}`;
+}
+
+// ═══════════════════════════════════════════
+// JOURNAL
+// ═══════════════════════════════════════════
+function addJEntry(t){
+  const jl=document.getElementById('jl');
+  if(jl.querySelector('.es')) jl.innerHTML='';
+  const d=document.createElement('div');
+  d.className='je';
+  d.id='je-'+t.id;
+  d.onclick=()=>reviewTrade(t.id);
+  d.innerHTML=`<div class="jh"><span class="jn">#${t.id} · ${t.tf}</span><span class="jt2">${t.time}</span></div>
+    <div><span class="${t.dir==='BUY'?'jdb':'jds'}">${t.dir}</span> · ${t.lot} lot · <span style="color:var(--text3)">${t.reason}</span></div>
+    <div class="jdet">${t.ep.toFixed(4)} → ${t.cp.toFixed(4)} (${t.pips.toFixed(1)} pts)</div>
+    <div class="jpnl ${t.pnl>=0?'p':'n'}">${t.pnl>=0?'+':''}$${t.pnl.toFixed(2)}</div>
+    ${t.note?`<div style="margin-top:4px;color:var(--text2);font-size:9px;font-style:italic;line-height:1.5">"${t.note}"</div>`:''}
+    <div class="je-review-hint">👆 Click to review on chart</div>`;
+  jl.prepend(d);
+}
+
+// Find the nearest candle index in a TF for a given timestamp
+function findCandleIdxByTime(tf, targetTime){
+  if(!tfData[tf]) return -1;
+  const candles = tfData[tf].candles;
+  let lo=0, hi=candles.length-1, best=0;
+  while(lo<=hi){
+    const mid=(lo+hi)>>1;
+    if(candles[mid].time<=targetTime){ best=mid; lo=mid+1; }
+    else hi=mid-1;
+  }
+  return best;
+}
+// ═══════════════════════════════════════════
+function reviewTrade(id){
+  const t = trades.find(t=>t.id===id);
+  if(!t){ addMsg('Trade not found.','warn'); return; }
+  if(!tfData[t.tf]){ addMsg(`${t.tf} data not loaded — cannot review this trade.`,'warn'); return; }
+
+  // Deselect previous
+  document.querySelectorAll('.je').forEach(el=>el.classList.remove('selected'));
+  const el=document.getElementById('je-'+id);
+  if(el) el.classList.add('selected');
+
+  // Toggle off if clicking same trade again
+  if(reviewTradeId===id){
+    reviewTradeId=null;
+    // Restore replay position
+    switchTF(activeTF);
+    reqDraw();
+    return;
+  }
+
+  reviewTradeId = id;
+
+  // Find entry/exit on the current active TF using timestamps
+  const eIdxOnTF = t.eTime ? findCandleIdxByTime(activeTF, t.eTime) : t.eI;
+  const cIdxOnTF = t.cTime ? findCandleIdxByTime(activeTF, t.cTime) : t.cI;
+  const d = tfData[activeTF];
+
+  // Set masterTime to just after the close candle
+  masterTime = d.candles[Math.min(cIdxOnTF + 5, d.candles.length-1)].time;
+  syncAllTFs();
+
+  // Zoom to show the trade with context
+  const tradeSpan = Math.abs(cIdxOnTF - eIdxOnTF);
+  zoom = Math.max(40, tradeSpan + 40);
+
+  // Pan so the trade is centered
+  const centerIdx = Math.floor((eIdxOnTF + cIdxOnTF) / 2);
+  const halfZoom = Math.floor(zoom / 2);
+  panOffset = Math.max(0, d.idx - centerIdx - halfZoom);
+  autoFollow = false;
+
+  // Switch to FREE mode so chart stays put
+  if(chartMode==='auto'){
+    chartMode='free';
+    const btn=document.getElementById('mode-btn');
+    btn.textContent='FREE';
+    btn.style.borderColor='var(--accent)';
+    btn.style.background='rgba(0,212,255,.08)';
+    btn.style.color='var(--accent)';
+  }
+
+  reqDraw();
+  swTab('journal');
+  addMsg(`Reviewing trade #${id} (${t.dir} on ${t.tf}). Entry: ${t.ep.toFixed(4)} → Exit: ${t.cp.toFixed(4)} · ${t.pnl>=0?'+':''}$${t.pnl.toFixed(2)}. Click the trade again to exit review.`,'info');
+}
+// ═══════════════════════════════════════════
+function updStats(){
+  const wins=trades.filter(t=>t.pnl>0), losses=trades.filter(t=>t.pnl<=0);
+  const wr=trades.length?(wins.length/trades.length*100).toFixed(0):0;
+  const bw=wins.length?Math.max(...wins.map(t=>t.pnl)):0;
+  const wl2=losses.length?Math.min(...losses.map(t=>t.pnl)):0;
+  const aw=wins.length?wins.reduce((s,t)=>s+t.pnl,0)/wins.length:0;
+  const al=losses.length?Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length):1;
+  const rr=al?(aw/al).toFixed(2):'—';
+  const ap=trades.length?trades.reduce((s,t)=>s+t.pnl,0)/trades.length:0;
+  let streak=0;
+  for(let i=trades.length-1;i>=0;i--){
+    if(i===trades.length-1) streak=trades[i].pnl>0?1:-1;
+    else if(streak>0&&trades[i].pnl>0) streak++;
+    else if(streak<0&&trades[i].pnl<=0) streak--;
+    else break;
+  }
+  document.getElementById('sw').textContent=wins.length;
+  document.getElementById('sl3').textContent=losses.length;
+  document.getElementById('swr').textContent=wr+'%';
+  document.getElementById('srr').textContent=rr;
+  document.getElementById('sbw').textContent='$'+bw.toFixed(2);
+  document.getElementById('swl').textContent='$'+Math.abs(wl2).toFixed(2);
+  const se=document.getElementById('sst');
+  se.textContent=streak>0?`+${streak}W`:streak<0?`${Math.abs(streak)}L`:'—';
+  se.className='sv2 '+(streak>0?'g':streak<0?'r':'');
+  const ae=document.getElementById('sap');
+  ae.textContent=(ap>=0?'+':'')+' $'+ap.toFixed(2);
+  ae.className='sv2 '+(ap>=0?'g':'r');
+  updEqChart();
+}
+
+function initEqChart(){
+  const c=document.getElementById('ec').getContext('2d');
+  eqChart=new Chart(c,{type:'line',data:{labels:['0'],datasets:[{data:[100000],borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.05)',borderWidth:1.5,pointRadius:0,fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(26,58,92,.25)'},ticks:{color:'#6a9ab8',font:{size:8,family:'Share Tech Mono'},maxTicksLimit:4}}},animation:false}});
+}
+
+function updEqChart(){
+  if(!eqChart) return;
+  eqChart.data.labels=eqHist.map((_,i)=>i);
+  eqChart.data.datasets[0].data=eqHist;
+  const up=eqHist[eqHist.length-1]>=eqHist[0];
+  eqChart.data.datasets[0].borderColor=up?'#00ff88':'#ff3355';
+  eqChart.data.datasets[0].backgroundColor=up?'rgba(0,255,136,.05)':'rgba(255,51,85,.05)';
+  eqChart.update();
+}
+
+// ═══════════════════════════════════════════
+// SESSION MANAGEMENT
+// ═══════════════════════════════════════════
+function getSessions(){
+  try{ return JSON.parse(localStorage.getItem('v75_sessions')||'[]'); }
+  catch(e){ return []; }
+}
+
+function saveCurrentSession(){
+  if(!trades.length){ addMsg('No trades in current session to save.','warn'); swTab('coach'); return; }
+  const sessions = getSessions();
+  const sessionNum = sessions.length + 1;
+  const wins = trades.filter(t=>t.pnl>0).length;
+  const losses = trades.filter(t=>t.pnl<=0).length;
+  const totalPnl = (bal-100000);
+  const session = {
+    id: Date.now(),
+    num: sessionNum,
+    date: new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),
+    time: new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
+    trades: JSON.parse(JSON.stringify(trades)),
+    bal: bal,
+    eqHist: [...eqHist],
+    tradeCnt: tradeCnt,
+    wins, losses,
+    pnl: totalPnl,
+    duration: document.getElementById('st2').textContent
+  };
+  sessions.push(session);
+  localStorage.setItem('v75_sessions', JSON.stringify(sessions));
+  renderSessionList();
+  swTab('sessions');
+  addMsg(`Session #${sessionNum} saved — ${wins}W/${losses}L · ${totalPnl>=0?'+':''}$${totalPnl.toFixed(2)}`,'info');
+}
+
+function loadSession(id){
+  const sessions = getSessions();
+  const session = sessions.find(s=>s.id===id);
+  if(!session) return;
+  if(!confirm(`Load Session #${session.num} (${session.date})? This will replace your current session.`)) return;
+  trades    = session.trades;
+  bal       = session.bal;
+  eq        = bal;
+  eqHist    = session.eqHist;
+  tradeCnt  = session.tradeCnt;
+  reviewTradeId = null;
+  document.getElementById('jl').innerHTML='';
+  trades.forEach(t=>addJEntry(t));
+  updStats(); updBal();
+  swTab('journal');
+  addMsg(`Session #${session.num} loaded — ${session.wins}W/${session.losses}L · ${session.pnl>=0?'+':''}$${session.pnl.toFixed(2)}`,'info');
+}
+
+function deleteSession(id, e){
+  e.stopPropagation();
+  if(!confirm('Delete this session? Cannot be undone.')) return;
+  let sessions = getSessions();
+  sessions = sessions.filter(s=>s.id!==id);
+  // Renumber
+  sessions.forEach((s,i)=>s.num=i+1);
+  localStorage.setItem('v75_sessions', JSON.stringify(sessions));
+  renderSessionList();
+}
+
+function renderSessionList(){
+  const sessions = getSessions();
+  const list = document.getElementById('sessionList');
+  if(!sessions.length){
+    list.innerHTML='<div class="es">No saved sessions yet.<br>Complete a session and<br>click 💾 SAVE.</div>';
+    return;
+  }
+  list.innerHTML='';
+  // Show newest first
+  [...sessions].reverse().forEach(s=>{
+    const pnlCol = s.pnl>=0 ? 'var(--green)' : 'var(--red)';
+    const pnlStr = (s.pnl>=0?'+':'')+'$'+s.pnl.toFixed(2);
+    const wr = s.trades.length ? Math.round(s.wins/s.trades.length*100) : 0;
+    const d = document.createElement('div');
+    d.className='sitem';
+    d.onclick=()=>loadSession(s.id);
+    d.innerHTML=`
+      <div class="sh">
+        <span class="snum">SESSION #${s.num}</span>
+        <span class="spnl" style="color:${pnlCol}">${pnlStr}</span>
+        <button class="sdel" onclick="deleteSession(${s.id},event)">✕</button>
+      </div>
+      <div class="sstats">
+        <span>📅 ${s.date} ${s.time}</span>
+        <span>📊 ${s.trades.length} trades</span>
+        <span>🎯 ${wr}% WR</span>
+      </div>
+      <div class="sstats" style="margin-top:3px">
+        <span style="color:var(--green)">✓ ${s.wins}W</span>
+        <span style="color:var(--red)">✗ ${s.losses}L</span>
+        <span style="color:var(--text3)">${s.duration||''}</span>
+      </div>`;
+    list.appendChild(d);
+  });
+}
+// ═══════════════════════════════════════════
+function openDebrief(){
+  if(!trades.length){ addMsg('No trades yet — complete a session first.','warn'); swTab('coach'); return; }
+  document.getElementById('debriefMo').classList.add('show');
+  document.getElementById('debriefLoading').style.display='block';
+  document.getElementById('debriefResult').style.display='none';
+  getDebrief();
+}
+
+function closeDebrief(){
+  document.getElementById('debriefMo').classList.remove('show');
+}
+
+async function getDebrief(){
+  const wins=trades.filter(t=>t.pnl>0);
+  const losses=trades.filter(t=>t.pnl<=0);
+  const totalPnl=(bal-100000).toFixed(2);
+  const wr=trades.length?(wins.length/trades.length*100).toFixed(0):0;
+  const avgWin=wins.length?(wins.reduce((s,t)=>s+t.pnl,0)/wins.length).toFixed(2):0;
+  const avgLoss=losses.length?(Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length)).toFixed(2):0;
+  const rr=avgLoss>0?(avgWin/avgLoss).toFixed(2):'—';
+
+  const tradeList=trades.map(t=>
+    `#${t.id} | ${t.dir} | ${t.tf} | Entry:${t.ep.toFixed(4)} Exit:${t.cp.toFixed(4)} | ${t.pips.toFixed(0)}pts | ${t.pnl>=0?'+':''}$${t.pnl.toFixed(2)} | ${t.reason}${t.note?' | Note: "'+t.note+'"':''}`
+  ).join('\n');
+
+  const summary=`SESSION STATS:
+- Trades: ${trades.length} (${wins.length}W / ${losses.length}L)
+- Win Rate: ${wr}%
+- Total P&L: ${totalPnl>=0?'+':''}$${totalPnl}
+- Avg Win: $${avgWin} | Avg Loss: $${avgLoss} | RR: ${rr}
+- Session time: ${document.getElementById('st2').textContent}
+
+TRADE LOG:
+${tradeList}`;
+
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if(!apiKey){ 
+    document.getElementById('debriefLoading').style.display='none';
+    document.getElementById('debriefResult').style.display='block';
+    document.getElementById('debriefResult').textContent='Please paste your Anthropic API key in the Coach tab first (sk-ant-...). Get it free at console.anthropic.com';
+    return;
+  }
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:1500,
+        system:`You are a professional V75 trading coach doing a post-session debrief. The trader uses Deriv's Volatility 75 Index, trades manually with a mixed trend and reversal style, and targets a 1:4 RR ratio. This is a backtesting/learning session.
+
+Give a thorough post-session debrief structured as follows:
+
+1. OVERALL PERFORMANCE
+2. WHAT WENT WELL
+3. WHAT TO IMPROVE
+4. DISCIPLINE CHECK
+5. ONE FOCUS FOR NEXT SESSION
+
+Be direct, specific. Reference actual trade numbers from the log. No generic advice. Max 450 words.`,
+        messages:[{role:'user',content:`Debrief my session:\n\n${summary}`}]
+      })
+    });
+    const data=await res.json();
+    const reply=data.content?.map(b=>b.text||'').join('')||'Could not generate debrief.';
+    document.getElementById('debriefLoading').style.display='none';
+    document.getElementById('debriefResult').style.display='block';
+    document.getElementById('debriefResult').textContent=reply;
+  }catch(e){
+    document.getElementById('debriefLoading').style.display='none';
+    document.getElementById('debriefResult').style.display='block';
+    document.getElementById('debriefResult').textContent='Connection error. Check your internet and try again.';
+  }
+}
+
+// ═══════════════════════════════════════════
+// COACH
+// ═══════════════════════════════════════════
+function toggleCoach(){
+  coachOn=!coachOn;
+  document.getElementById('tsw').className='tsw'+(coachOn?' on':'');
+  document.getElementById('tlbl').textContent=coachOn?'COACH ON':'COACH MUTED';
+  addMsg(coachOn?"Coach back on. Watching. 👁️":"Muted. Still logging. 🔇",'info');
+}
+
+function addMsg(txt,type='info'){
+  const w=document.getElementById('cms');
+  const d=document.createElement('div');
+  d.className='cm'+(type==='warn'?' w':type==='good'?' g':type==='danger'?' d':'');
+  const lt=type==='good'?'✓ COACH':type==='warn'?'⚠ COACH':type==='danger'?'🚨 COACH':'COACH';
+  d.innerHTML=`<div class="cl ${type==='warn'?'w':type==='good'?'g':type==='danger'?'d':''}">${lt}</div>${txt.replace(/\n/g,'<br>')}`;
+  w.appendChild(d);
+  const cp=document.getElementById('cop'); cp.scrollTop=cp.scrollHeight;
+}
+
+async function askCoach(){
+  const inp=document.getElementById('aci'), q=inp.value.trim();
+  if(!q) return; inp.value='';
+  const w=trades.filter(t=>t.pnl>0).length, l=trades.filter(t=>t.pnl<=0).length;
+  const loaded=TFS.filter(t=>tfData[t]).join(', ')||'none';
+  const ctx2=`Active: ${activeTF||'none'}. Loaded: ${loaded}. Trades: ${trades.length}(${w}W/${l}L). P&L: $${(bal-100000).toFixed(2)}. Open: ${curTrade?curTrade.dir+'@'+curTrade.ep.toFixed(4)+'['+curTrade.tf+']':'none'}. Time: ${masterTime?new Date(masterTime).toISOString().substring(0,16):'n/a'}.`;
+  const ld=document.createElement('div'); ld.className='cm';
+  ld.innerHTML=`<div class="cl">YOU</div>${q}<br><br><div class="cl">COACH</div><span class="ld">thinking</span>`;
+  document.getElementById('cms').appendChild(ld);
+  const cp=document.getElementById('cop'); cp.scrollTop=cp.scrollHeight;
+  try{
+    const apiKey=document.getElementById('apiKey').value.trim();
+    if(!apiKey){ ld.querySelector('.ld').textContent='Please paste your Anthropic API key above first.'; return; }
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({
+      model:'claude-sonnet-4-6',max_tokens:1000,
+      system:`You are a professional V75 trading coach. The trader uses Deriv's Volatility 75 Index, trades manually tick by tick with a mixed trend and reversal style, targets 1:4 RR ratio, and is currently in a backtesting/learning phase.
+
+Session: ${ctx2}
+Be direct, brief and specific to V75. Max 120 words.`,
+      messages:[{role:'user',content:q}]
+    })});
+    const data=await res.json();
+    const reply=data.content?.map(b=>b.text||'').join('')||"Can't connect.";
+    ld.innerHTML=`<div class="cl">YOU</div>${q}<br><br><div class="cl g">COACH</div>${reply.replace(/\n/g,'<br>')}`;
+  }catch(e){ld.innerHTML=`<div class="cl">YOU</div>${q}<br><br><div class="cl d">COACH</div>Connection error.`;}
+  cp.scrollTop=cp.scrollHeight;
+}
+
+// ═══════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════
+function swTab(t){
+  const ts=['coach','journal','stats','sessions'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',ts[i]===t));
+  document.querySelectorAll('.tc').forEach(el=>el.classList.remove('on'));
+  document.getElementById('tc-'+t).classList.add('on');
+}
+
+function resetSession(){
+  if(trades.length>0&&!confirm('Reset session? Trades cleared. CSVs remain loaded.'))return;
+  trades=[];curTrade=null;eqHist=[100000];bal=100000;eq=100000;tradeCnt=0;
+  panOffset=0; autoFollow=true; chartMode='auto'; reviewTradeId=null;
+  const mb=document.getElementById('mode-btn');
+  mb.textContent='AUTO'; mb.style.borderColor='var(--green)'; mb.style.background='rgba(0,255,136,.08)'; mb.style.color='var(--green)';
+  // Reset masterTime to first available candle
+  masterTime=null;
+  TFS.forEach(tf=>{
+    if(tfData[tf]){
+      if(masterTime===null) masterTime=tfData[tf].candles[0].time;
+    }
+  });
+  syncAllTFs();
+  document.getElementById('cb2').disabled=true;
+  document.getElementById('drag-hint').style.display='none';
+  document.getElementById('pos').innerHTML='<div class="np">No open position</div>';
+  document.getElementById('jl').innerHTML='<div class="es">No trades yet.<br>Your journal starts<br>with your first trade.</div>';
+  document.getElementById('cms').innerHTML='';
+  document.getElementById('std').className=activeTF?'sd a':'sd';
+  document.getElementById('lw').style.display='none';
+  document.getElementById('pb').textContent='▶ PLAY';
+  document.getElementById('pb').className='btn p';
+  if(playing){playing=false;clearInterval(piv);}
+  updBal();updStats();reqDraw();
+  addMsg('Session reset. CSVs still loaded. Replay back to start.','info');
+}
+</script>
+</body>
+</html>
